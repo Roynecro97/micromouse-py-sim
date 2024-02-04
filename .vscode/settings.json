@@ -1,0 +1,11 @@
+{
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.autopep8",
+        "editor.formatOnSave": true
+    },
+    "editor.formatOnSaveMode": "modificationsIfAvailable",
+    "autopep8.args": [
+        "--max-line-length=140",
+        "-aaa"
+    ]
+}
