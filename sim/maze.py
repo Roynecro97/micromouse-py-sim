@@ -289,7 +289,7 @@ class Maze:
             If not provided, the file size must either be a square size (will be detected from the content length)
             or specified in the file name in a "name.{height}x{width}.maz" format.
         """
-        if isinstance(maz, os.PathLike):
+        if isinstance(maz, (os.PathLike, str, bytes)):
             maz = open(maz, "rb")
 
         with maz:
@@ -349,7 +349,7 @@ class Maze:
         else:
             cells = []
 
-        if isinstance(num_file, os.PathLike):
+        if isinstance(num_file, (os.PathLike, str, bytes)):
             num_file = open(num_file, "rt", encoding="ASCII")
 
         with num_file:
@@ -400,7 +400,7 @@ class Maze:
             A text drawing of the maze.
             TODO: add format explanation and links
         """
-        if isinstance(maze_file, os.PathLike):
+        if isinstance(maze_file, (os.PathLike, str, bytes)):
             maze_file = open(maze_file, "rt", encoding="ASCII")
 
         with maze_file:
@@ -482,7 +482,7 @@ class Maze:
             A csv where each row has the cells for the corresponding row
             TODO: add format explanation and links
         """
-        if isinstance(csv_file, os.PathLike):
+        if isinstance(csv_file, (os.PathLike, str, bytes)):
             csv_file = open(csv_file, "rt", encoding="ASCII")
 
         with csv_file:
@@ -622,13 +622,13 @@ class Maze:
         for added in walls:
             match added:
                 case Walls.NORTH if row > 0:
-                    self._cells[self._index(row - 1, col)] |= Walls.NORTH.value
+                    self._cells[self._index(row - 1, col)] |= Walls.SOUTH.value
                 case Walls.EAST if col < self.width - 1:
-                    self._cells[self._index(row, col + 1)] |= Walls.EAST.value
+                    self._cells[self._index(row, col + 1)] |= Walls.WEST.value
                 case Walls.SOUTH if row < self.height - 1:
-                    self._cells[self._index(row + 1, col)] |= Walls.SOUTH.value
+                    self._cells[self._index(row + 1, col)] |= Walls.NORTH.value
                 case Walls.WEST if col > 0:
-                    self._cells[self._index(row, col - 1)] |= Walls.WEST.value
+                    self._cells[self._index(row, col - 1)] |= Walls.EAST.value
 
     def remove_walls(self, row: int, col: int, walls: Walls):
         """Remove walls from the maze."""
@@ -642,22 +642,30 @@ class Maze:
                 case Walls.NORTH:
                     if row == 0:
                         raise ValueError("cannot remove the NORTH wall from the top row")
-                    self._cells[self._index(row - 1, col)] &= (~Walls.NORTH).value
+                    self._cells[self._index(row - 1, col)] &= (~Walls.SOUTH).value
                 case Walls.EAST:
                     if col == self.width - 1:
                         raise ValueError("cannot remove the EAST wall from the rightmost column")
-                    self._cells[self._index(row, col + 1)] &= (~Walls.EAST).value
+                    self._cells[self._index(row, col + 1)] &= (~Walls.WEST).value
                 case Walls.SOUTH:
                     if row == self.height - 1:
                         raise ValueError("cannot remove the SOUTH wall from the bottom row")
-                    self._cells[self._index(row + 1, col)] &= (~Walls.SOUTH).value
+                    self._cells[self._index(row + 1, col)] &= (~Walls.NORTH).value
                 case Walls.WEST:
                     if col == 0:
                         raise ValueError("cannot remove the WEST wall from the leftmost column")
-                    self._cells[self._index(row, col - 1)] &= (~Walls.WEST).value
+                    self._cells[self._index(row, col - 1)] &= (~Walls.EAST).value
 
-    def __iter__(self) -> Iterator[Walls]:
-        return map(Walls, self._cells)
+    def __iter__(self) -> Iterator[tuple[int, int, Walls]]:
+        """Iterate over the cells in the maze, with indexes.
+
+        Returns:
+            Iterator: An iterator over the cells and their indexes.
+
+        Yields:
+            (int, int, Walls): A (row, col, walls) tuple.
+        """
+        return ((*divmod(idx, self.width), Walls(cell)) for idx, cell in enumerate(self._cells))
 
     # A maze is not a container: ``Walls.NORTH in maze`` should not work.
     __contains__ = None
