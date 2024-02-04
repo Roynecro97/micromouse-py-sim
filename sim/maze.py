@@ -19,7 +19,7 @@ import numpy as np
 
 if TYPE_CHECKING:
     from os import PathLike
-    from typing import BinaryIO, Callable, Literal, Self, TextIO, TypeAlias
+    from typing import BinaryIO, Callable, Iterator, Literal, Self, TextIO, TypeAlias
 
 MazeSize: TypeAlias = "tuple[int, int]"
 
@@ -655,6 +655,12 @@ class Maze:
                     if col == 0:
                         raise ValueError("cannot remove the WEST wall from the leftmost column")
                     self._cells[self._index(row, col - 1)] &= (~Walls.WEST).value
+
+    def __iter__(self) -> Iterator[Walls]:
+        return map(Walls, self._cells)
+
+    # A maze is not a container: ``Walls.NORTH in maze`` should not work.
+    __contains__ = None
 
     def render_lines(
             self,
