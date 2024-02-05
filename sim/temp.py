@@ -3,12 +3,18 @@ from __future__ import annotations
 import operator
 
 from dataclasses import dataclass
+from os import environ
 from typing import Tuple
 
 import numpy as np
-import pygame
 
 from .maze import Maze, Walls
+
+# Disable the prompt triggered by importing `pygame`.
+# autopep8: off
+environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
+import pygame  # pylint: disable=wrong-import-order,wrong-import-position
+# autopep8: on
 
 
 @dataclass
