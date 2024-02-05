@@ -14,6 +14,8 @@ if TYPE_CHECKING:
     from typing import Callable, Iterable, Literal
 
 
+# TODO: replace prints with logging
+
 class Action(Enum):
     """TODO: docs"""
     READY = auto()
@@ -114,20 +116,29 @@ def random_robot(maze: Maze, goals: set[tuple[int, int]]) -> Robot:
     Returns:
         Robot: The robot's brain.
     """
+    print(f"randomouse: starting in a {maze.height}x{maze.width} maze")
+    print(f"randomouse: aiming for {goals}")
     destination = set(goals)
     pos_row, pos_col, facing = yield Action.READY
+    print(f"randomouse: starting at {(pos_row, pos_col)} facing {facing}")
 
     while (pos_row, pos_col) not in destination:
         walls = maze[pos_row, pos_col]
+        print(f"randomouse: at {(pos_row, pos_col)} facing {facing} with {walls}")
         new_direction = random.choice(walls_to_directions(walls))
+        print(f"randomouse: chose to migrate {new_direction}")
         if new_direction == facing:
+            print("randomouse: will move forward")
             action = Action.FORWARD
         elif new_direction == facing.turn_back():
+            print("randomouse: will move in reverse")
             action = Action.BACKWARDS
         else:
             if new_direction == facing.turn_left():
+                print("randomouse: turning left")
                 turn_action = Action.TURN_LEFT
             elif new_direction == facing.turn_right():
+                print("randomouse: turning right")
                 turn_action = Action.TURN_RIGHT
             else:
                 raise AssertionError(f"invalid turn from {facing} to {new_direction}")
@@ -135,9 +146,11 @@ def random_robot(maze: Maze, goals: set[tuple[int, int]]) -> Robot:
             assert (r, c) == (pos_row, pos_col), "moved while turning"
             assert maze[r, c] == walls, "walls changed while turning"
             assert facing == new_direction, "turning failed"
+            print(f"randomouse: now facing {facing}, will move forward")
             action = Action.FORWARD
         pos_row, pos_col, facing = yield action
 
+    print("randomouse: victory")
     # # Victory dance
     # while True:
     #     yield random.choice((Action.TURN_LEFT, Action.TURN_RIGHT))
@@ -222,6 +235,8 @@ class Simulator:
 
     def restart(self, alg: Algorithm):
         """Restart the simulator."""
+        print(f"sim: restarting with a {self.maze.height}x{self.maze.width} maze")
+        print(f"sim: robot will start at {self._begin[:-1]} facing {self._begin[-1]}")
         self._robot_maze = Maze.empty(*self._maze.size)
         self._robot_pos = self._begin
         self._robot_maze[self._robot_pos[:-1]] = self._maze[self._robot_pos[:-1]]
@@ -238,6 +253,7 @@ class Simulator:
         if state is not Action.READY:
             raise RuntimeError(f"robot malfunction - yielded {state} instead of {Action.READY}")
         self._status = SimulationStatus.READY
+        print("sim: robot is ready")
 
     def step(self) -> SimulationStatus:
         """Perform a single robot action."""
@@ -247,21 +263,27 @@ class Simulator:
         # self._status = SimulationStatus.IN_PROGRESS
 
         if self._status is SimulationStatus.ERROR:
+            print(f"sim: refusing to step, status is {self.status}")
             return self._status
 
         if self._status is SimulationStatus.READY:
+            print("sim: starting progress")
             self._status = SimulationStatus.IN_PROGRESS
 
         row, col, facing = self._robot_pos
+        print(f"sim: robot is at {(row, col)} facing {facing}")
 
         try:
             action = self._robot.send(RobotState(*self._robot_pos))
         except StopIteration:
             self._status = SimulationStatus.FINISHED if (row, col) in self._end else SimulationStatus.ERROR
+            print(f"sim: robot stopped, status is {self.status}")
             return self._status
         except Exception as err:
             self._status = SimulationStatus.ERROR
             raise RuntimeError("robot encountered an error") from err
+
+        print(f"sim: selected action is {action}")
 
         match action:
             case Action.READY:
@@ -269,11 +291,14 @@ class Simulator:
                 raise RuntimeError(f"robot malfunction - yielded {action} instead of moving")
             case Action.FORWARD | Action.BACKWARDS:
                 if not self._robot_step(facing if action is Action.FORWARD else facing.turn_back()):
+                    print("sim: step error")
                     self._status = SimulationStatus.ERROR
             case Action.TURN_LEFT:
                 self._robot_pos = (row, col, facing.turn_left())
+                print("sim: robot turned left")
             case Action.TURN_RIGHT:
                 self._robot_pos = (row, col, facing.turn_right())
+                print("sim: robot turned right")
 
         return self._status
 
@@ -281,7 +306,10 @@ class Simulator:
         """Try to advance the robot in the given direction, return False if not possible."""
         row, col, facing = self._robot_pos
 
+        print(f"sim: stepping from {(row, col)} to {direction} (while facing {facing})")
+
         if direction_to_wall(direction) in self._maze[row, col]:
+            print(f"sim: crashed! {direction_to_wall(direction)=!s} to {self._maze[row, col]=!s}")
             # Robot crashed into a wall
             return False
 
@@ -294,6 +322,8 @@ class Simulator:
             case _: raise AssertionError(f"only the primary directions are supported right now (not {direction})")
 
         self._robot_maze[self._robot_pos[:-1]] = self._maze[self._robot_pos[:-1]]
+
+        print(f"sim: robot is now at {self._robot_pos[:-1]} facing {self._robot_pos[-1]}")
         return True
 
     @property

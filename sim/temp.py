@@ -154,6 +154,7 @@ def _main():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     sim.step()
+                    print(f"pygame: after step - {sim.maze[sim.robot_pos[:-1]]=} {sim.robot_maze[sim.robot_pos[:-1]]=}")
                 if event.key in (pygame.K_q, pygame.K_ESCAPE):
                     running = False
 
