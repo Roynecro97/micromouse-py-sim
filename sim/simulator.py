@@ -11,7 +11,7 @@ from .maze import Direction, Maze, RelativeDirection, Walls
 
 if TYPE_CHECKING:
     from collections.abc import Generator
-    from typing import Callable, Literal
+    from typing import Callable, Iterable, Literal
 
 
 class Action(Enum):
@@ -47,15 +47,13 @@ class Action(Enum):
 
 def turns_for_rel_direction(
     direction: RelativeDirection,
-    turn_action: Literal[Action.TURN_LEFT, Action.TURN_RIGHT, None] = None,
-) -> list[Action]:
+    follow: Literal[RelativeDirection.LEFT, RelativeDirection.RIGHT] = RelativeDirection.LEFT,
+) -> list[Literal[Action.TURN_LEFT, Action.TURN_RIGHT]]:
     """Create the turns needed to face in a relative direction."""
     match direction:
         case RelativeDirection.FRONT: return []
-        case RelativeDirection.BACK: return [turn_action or Action.TURN_LEFT] * 2
-        case RelativeDirection.LEFT if turn_action is Action.TURN_RIGHT: return [turn_action] * 3
+        case RelativeDirection.BACK: return [Action.from_rel_direction(follow.invert())] * 2
         case RelativeDirection.LEFT: return [Action.TURN_LEFT]
-        case RelativeDirection.RIGHT if turn_action is Action.TURN_LEFT: return [turn_action] * 3
         case RelativeDirection.RIGHT: return [Action.TURN_RIGHT]
 
 
@@ -79,7 +77,6 @@ class RobotState(NamedTuple):
     row: int
     col: int
     facing: Direction
-    current_cell: Walls
 
 # RobotState: TypeAlias = "tuple[int, int, Direction, Walls]"
 
@@ -104,10 +101,10 @@ def walls_to_directions(walls: Walls) -> list[Direction]:
 def direction_to_wall(direction: Direction) -> Walls:
     """TODO: docs (converts a direction spec into a wall)"""
     match direction:
-        case Direction.NORTH: return Walls.WEST
-        case Direction.EAST: return Walls.NORTH
-        case Direction.SOUTH: return Walls.EAST
-        case Direction.WEST: return Walls.SOUTH
+        case Direction.NORTH: return Walls.NORTH
+        case Direction.EAST: return Walls.EAST
+        case Direction.SOUTH: return Walls.SOUTH
+        case Direction.WEST: return Walls.WEST
         case _: raise ValueError(f"can only convert the primary directions (not {direction})")
 
 
@@ -118,10 +115,10 @@ def random_robot(maze: Maze, goals: set[tuple[int, int]]) -> Robot:
         Robot: The robot's brain.
     """
     destination = set(goals)
-    pos_row, pos_col, facing, walls = yield Action.READY
-    maze[pos_row, pos_col] = walls
+    pos_row, pos_col, facing = yield Action.READY
 
     while (pos_row, pos_col) not in destination:
+        walls = maze[pos_row, pos_col]
         new_direction = random.choice(walls_to_directions(walls))
         if new_direction == facing:
             action = Action.FORWARD
@@ -134,13 +131,12 @@ def random_robot(maze: Maze, goals: set[tuple[int, int]]) -> Robot:
                 turn_action = Action.TURN_RIGHT
             else:
                 raise AssertionError(f"invalid turn from {facing} to {new_direction}")
-            r, c, facing, w = yield turn_action
+            r, c, facing = yield turn_action
             assert (r, c) == (pos_row, pos_col), "moved while turning"
-            assert w == walls, "walls changed while turning"
+            assert maze[r, c] == walls, "walls changed while turning"
             assert facing == new_direction, "turning failed"
             action = Action.FORWARD
-        pos_row, pos_col, facing, walls = yield action
-        maze[pos_row, pos_col] = walls
+        pos_row, pos_col, facing = yield action
 
     # # Victory dance
     # while True:
@@ -157,23 +153,17 @@ def _wall_follower_robot(maze: Maze, goals: set[tuple[int, int]], *
     destination = set(goals)
 
     match follow:
-        case RelativeDirection.LEFT: turn_action = Action.TURN_LEFT
-        case RelativeDirection.RIGHT: turn_action = Action.TURN_RIGHT
+        case RelativeDirection.LEFT | RelativeDirection.RIGHT: pass
         case RelativeDirection(): raise ValueError(f"invalid follow direction: {follow}")
         case _: raise TypeError(f"invalid follow type: {type(follow)}")
     next_direction = follow.invert()
 
-    pos_row, pos_col, facing, walls = yield Action.READY
-    maze[pos_row, pos_col] = walls
+    pos_row, pos_col, facing = yield Action.READY
 
     while (pos_row, pos_col) not in destination:
-        assert maze[pos_row, pos_col] is walls, "we're being lied to"
+        walls = maze[pos_row, pos_col]
         if direction_to_wall(turn := facing.turn(follow)) not in walls:
             rel = follow
-            # r, c, facing, w = yield turn_action
-            # assert (r, c) == (pos_row, pos_col), "moved while turning"
-            # assert w == walls, "walls changed while turning"
-            # assert facing == turn, "turning failed"
         elif direction_to_wall(turn := turn.turn(next_direction)) not in walls:
             assert turn == facing, "turned back but didn't return"
             rel = RelativeDirection.FRONT
@@ -185,14 +175,13 @@ def _wall_follower_robot(maze: Maze, goals: set[tuple[int, int]], *
             # we're in a box...
             return
 
-        for _ in range(needed_turns_for_rel_direction(rel, turn_action)):
-            r, c, facing, w = yield turn_action
+        for turn_action in turns_for_rel_direction(rel, follow):
+            r, c, facing = yield turn_action
             assert (r, c) == (pos_row, pos_col), "moved while turning"
-            assert w == walls, "walls changed while turning"
+            assert maze[r, c] == walls, "walls changed while turning"
         assert facing == turn, "turning failed"
 
-        pos_row, pos_col, facing, walls = yield Action.FORWARD
-        maze[pos_row, pos_col] = walls
+        pos_row, pos_col, facing = yield Action.FORWARD
 
     # # Victory spin
     # while True:
@@ -225,7 +214,7 @@ class Simulator:
     _status: SimulationStatus
     _robot_pos: tuple[int, int, Direction]
 
-    def __init__(self, alg: Algorithm, maze: Maze, begin: tuple[int, int, Direction], *end: tuple[int, int]):
+    def __init__(self, alg: Algorithm, maze: Maze, begin: tuple[int, int, Direction], end: Iterable[tuple[int, int]]):
         self._maze = maze
         self._begin = begin
         self._end = set(end)
@@ -235,6 +224,7 @@ class Simulator:
         """Restart the simulator."""
         self._robot_maze = Maze.empty(*self._maze.size)
         self._robot_pos = self._begin
+        self._robot_maze[self._robot_pos[:-1]] = self._maze[self._robot_pos[:-1]]
 
         self._robot = alg(self._robot_maze, self._end)
 
@@ -265,9 +255,10 @@ class Simulator:
         row, col, facing = self._robot_pos
 
         try:
-            action = self._robot.send(RobotState(*self._robot_pos, self._maze[row, col]))
+            action = self._robot.send(RobotState(*self._robot_pos))
         except StopIteration:
             self._status = SimulationStatus.FINISHED if (row, col) in self._end else SimulationStatus.ERROR
+            return self._status
         except Exception as err:
             self._status = SimulationStatus.ERROR
             raise RuntimeError("robot encountered an error") from err
@@ -301,6 +292,8 @@ class Simulator:
             case Direction.SOUTH: self._robot_pos = (row + 1, col, facing)
             case Direction.WEST: self._robot_pos = (row, col - 1, facing)
             case _: raise AssertionError(f"only the primary directions are supported right now (not {direction})")
+
+        self._robot_maze[self._robot_pos[:-1]] = self._maze[self._robot_pos[:-1]]
         return True
 
     @property

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from os import environ
-from typing import Tuple
+
+from typing import Iterable
 
 import numpy as np
 
-from .maze import Maze, Walls, Direction
+from .maze import Maze, Walls, Direction, RelativeDirection
+from .simulator import Simulator, SimulationStatus, random_robot, wall_follower_robot
 
 # Disable the prompt triggered by importing `pygame`.
 # autopep8: off
@@ -23,26 +25,32 @@ class MazeRenderer:
     robot_main_color: str = 'blue'
     robot_second_color: str = 'yellow'
 
-    goal_cells: list[tuple[int, int]] = [(4, 1)]
     goal_color: str = 'green'
 
     @classmethod
-    def draw(cls, screen: pygame.surface.Surface, maze: Maze, offset: Tuple[int, int] = (
-            0, 0), robot_pos: Tuple[int, int] = (0, 0), robot_direction: Direction = Direction.NORTH):
+    def draw(
+            cls,
+            screen: pygame.surface.Surface,
+            maze: Maze,
+            offset: tuple[int, int] = (0, 0),
+            goal_cells: Iterable[tuple[int, int]] = (),
+            robot_pos: tuple[int, int] = (0, 0),
+            robot_direction: Direction = Direction.NORTH,
+    ):
         """Draw the maze on screen.
 
         Args:
             screen (pygame.surface.Surface): screen to draw on.
             maze (Maze): maze to draw.
-            offset (Tuple[int, int], optional): offset for maze in pixels from (0, 0). Defaults to (0, 0).
-            robot_pos (Tuple[int, int], optional): position of robot in maze (row, col). Defaults to (0, 0).
+            offset (tuple[int, int], optional): offset for maze in pixels from (0, 0). Defaults to (0, 0).
+            robot_pos (tuple[int, int], optional): position of robot in maze (row, col). Defaults to (0, 0).
             robot_direction (Direction): direction robot is facing. Defaults to north.
         """
         color = pygame.Color(cls.wall_color)
         for row, col, walls in maze:
             x = col * cls.tile_size + offset[0]
             y = row * cls.tile_size + offset[1]
-            for cell in cls.goal_cells:
+            for cell in goal_cells:
                 if row == cell[0] and col == cell[1]:
                     pygame.draw.rect(screen, cls.goal_color, pygame.Rect(x, y, cls.tile_size, cls.tile_size))
 
@@ -59,14 +67,14 @@ class MazeRenderer:
                 cls.draw_robot(screen, (x, y), robot_direction)
 
     @classmethod
-    def draw_robot(cls, screen: pygame.surface.Surface, robot_pos: Tuple[int, int], robot_direction: Direction):
+    def draw_robot(cls, screen: pygame.surface.Surface, robot_pos: tuple[int, int], robot_direction: Direction):
         """Draw robot on screen.
 
         Args:
             screen (pygame.surface.Surface): screen to draw on.
-            robot_pos (Tuple[int, int]): position of robot in maze (in pixels).
+            robot_pos (tuple[int, int]): position of robot in maze (in pixels).
             robot_direction (Direction): direction robot is facing
-            offset (Tuple[int, int], optional): offset for maze in pixels from (0, 0). Defaults to (0, 0).
+            offset (tuple[int, int], optional): offset for maze in pixels from (0, 0). Defaults to (0, 0).
         """
         robot_radius = cls.robot_size // 2
         robot_pos = (robot_pos[0] + cls.tile_size // 2, robot_pos[1] + cls.tile_size // 2)
@@ -77,8 +85,8 @@ class MazeRenderer:
 
 
 class Robot:
-    def __init__(self, start_pos: Tuple[int, int], start_heading: Direction = Direction.NORTH):
-        self.pos: Tuple[int, int] = start_pos
+    def __init__(self, start_pos: tuple[int, int], start_heading: Direction = Direction.NORTH):
+        self.pos: tuple[int, int] = start_pos
         self.heading: Direction = start_heading
 
     def move_forward(self):
@@ -100,7 +108,7 @@ class Robot:
                     self.pos[1] + round(np.sin(self.heading.to_radians())))
 
 
-def draw_text(screen: pygame.surface.Surface, text: str, size: int, center: Tuple[int, int], color='white'):
+def draw_text(screen: pygame.surface.Surface, text: str, size: int, center: tuple[int, int], color='white'):
     font = pygame.font.Font(pygame.font.get_default_font(), size)
     text = font.render(text, True, color)
     textRect = text.get_rect()
@@ -122,9 +130,12 @@ def _main():
     #     b'\x0A\x0C\x06\x0C\x02'
     #     b'\x0E\x0D\x05\x05\x06'
     # )
-    maze = Maze.from_file('mazes/simple.maze')
-    robot_maze = Maze.empty(*maze.size)
-    robot_maze.add_walls(0, 0, maze[0, 0])
+    sim = Simulator(
+        alg=wall_follower_robot(RelativeDirection.RIGHT),
+        maze=Maze.from_file('mazes/simple.maze'),
+        begin=(0, 0, Direction.SOUTH),
+        end={(1, 2)},
+    )
 
     pygame.init()
     screen = pygame.display.set_mode((1280, 720))
@@ -141,26 +152,17 @@ def _main():
             if event.type == pygame.QUIT:
                 running = False
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_w:
-                    robot.move_forward()
-                if event.key == pygame.K_s:
-                    robot.move_reverse()
-                if event.key == pygame.K_a:
-                    robot.turn_left()
-                if event.key == pygame.K_d:
-                    robot.turn_right()
+                if event.key == pygame.K_SPACE:
+                    sim.step()
                 if event.key in (pygame.K_q, pygame.K_ESCAPE):
                     running = False
-
-                maze_pos = robot.pos[1], robot.pos[0]
-                if w := maze.get(*maze_pos):
-                    robot_maze[maze_pos] = w
 
         screen.fill("black")
         draw_text(screen, 'Full Maze', 40, (250, 40))
         draw_text(screen, 'Robot View', 40, (970, 40))
-        MazeRenderer.draw(screen, maze, full_maze_offset, robot.pos, robot.heading)
-        MazeRenderer.draw(screen, robot_maze, robot_maze_offset, robot.pos, robot.heading)
+        robot_y, robot_x, robot_heading = sim.robot_pos
+        MazeRenderer.draw(screen, sim.maze, full_maze_offset, sim.end, (robot_x, robot_y), robot_heading)
+        MazeRenderer.draw(screen, sim.robot_maze, robot_maze_offset, sim.end, (robot_x, robot_y), robot_heading)
         pygame.display.update()
 
     pygame.quit()
