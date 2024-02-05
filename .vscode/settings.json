@@ -11,6 +11,9 @@
     "pylint.importStrategy": "fromEnvironment",
     "autopep8.importStrategy": "fromEnvironment",
     "cSpell.words": [
+        "dtype",
+        "dtypes",
+        "ndarray",
         "pygame"
     ]
 }

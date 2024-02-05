@@ -10,7 +10,7 @@ import math
 import os
 import re
 
-from enum import Flag, IntEnum
+from enum import auto, Enum, Flag, IntEnum
 from functools import reduce
 from operator import or_
 from typing import cast, TYPE_CHECKING
@@ -18,10 +18,19 @@ from typing import cast, TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from os import PathLike
-    from typing import BinaryIO, Callable, Iterator, Literal, Self, TextIO, TypeAlias
+    from typing import BinaryIO, Callable, Literal, Self, TextIO, TypeAlias
 
 MazeSize: TypeAlias = "tuple[int, int]"
+
+
+class RelativeDirection(Enum):
+    """Relative directions."""
+    FRONT = auto()
+    BACK = auto()
+    LEFT = auto()
+    RIGHT = auto()
 
 
 class Direction(IntEnum):
@@ -94,6 +103,34 @@ class Direction(IntEnum):
             case Direction.NORTH_WEST: return Direction.NORTH
             case Direction.SOUTH_EAST: return Direction.SOUTH
             case Direction.SOUTH_WEST: return Direction.WEST
+
+    def turn(self, rel: RelativeDirection) -> Direction:
+        """Return the direction that is the result of turning in the provided relative direction."""
+        match rel:
+            case RelativeDirection.FRONT: return self
+            case RelativeDirection.BACK: return self.turn_back()
+            case RelativeDirection.LEFT: return self.turn_left()
+            case RelativeDirection.RIGHT: return self.turn_right()
+
+    def half_turn(self, rel: RelativeDirection) -> Direction:
+        """Return the direction that is the result of half a turn in the provided relative direction."""
+        match rel:
+            case RelativeDirection.FRONT: return self
+            case RelativeDirection.BACK: raise ValueError("cannot half turn back")
+            case RelativeDirection.LEFT: return self.half_turn_left()
+            case RelativeDirection.RIGHT: return self.half_turn_right()
+
+    def to_degrees(self) -> Literal[0, 45, 90, 135, 180, 225, 270, 315]:  # pylint: disable=too-many-return-statements
+        """Get the rotation degrees. EAST is 0 deg, degrees increase clockwise."""
+        match self:
+            case Direction.EAST: return 0
+            case Direction.SOUTH_EAST: return 45
+            case Direction.SOUTH: return 90
+            case Direction.SOUTH_WEST: return 135
+            case Direction.WEST: return 180
+            case Direction.NORTH_WEST: return 225
+            case Direction.NORTH: return 270
+            case Direction.NORTH_EAST: return 315
 
     def __or__(self, other: Self | int) -> Self:
         return type(self)(super().__or__(other))
@@ -571,9 +608,12 @@ class Maze:
 
     def get[T](self, row: int, col: int, default: T = None) -> Walls | T:
         """Get a cell from the maze, or ``default`` if it doesn't exist."""
-        cell = self._index(row, col)
-        if cell >= self.cell_size:
+        if row >= self.height or col >= self.width:
             return default
+        cell = self._index(row, col)
+        assert cell < self.cell_size, f"bad cell calculation for {self.size=}, ({row=}, {col=}), {cell=}"
+        # if cell >= self.cell_size:
+        #     return default
         return Walls(self._cells[cell])
 
     def __getitem__(self, idx: tuple[int, int]) -> Walls:
@@ -670,14 +710,14 @@ class Maze:
     # A maze is not a container: ``Walls.NORTH in maze`` should not work.
     __contains__ = None
 
-    def render_lines(
+    def render_screen(
             self,
             charset: Charset = ascii_charset,
             cell_width: int = 3,
             cell_height: int = 1,
             force_corners: bool = True,
-    ) -> list[str]:
-        """Render the maze as text (in separate lines)"""
+    ) -> np.ndarray[tuple[int, int], np.dtypes.StrDType]:
+        """Render the maze as text (in a numpy 2D array)"""
         screen = np.array([[' ' for _ in range(self.width * (cell_width + 1) + 1)] for _ in range(self.height * (cell_height + 1) + 1)])
         bottom_row = self.height * (cell_height + 1)
         rightmost_col = self.width * (cell_width + 1)
@@ -726,11 +766,21 @@ class Maze:
             screen[top_row + 1:top_row + 1 + cell_height, rightmost_col] = charset(LineDirection.VERTICAL)
             if row == self.height - 1:
                 screen[bottom_row, rightmost_col] = charset(LineDirection.UP | LineDirection.LEFT)
-        return [''.join(row) for row in screen]
+        return screen
+
+    def render_lines(
+            self,
+            charset: Charset = ascii_charset,
+            cell_width: int = 3,
+            cell_height: int = 1,
+            force_corners: bool = True,
+    ) -> list[str]:
+        """Render the maze as text (in separate lines)"""
+        return [''.join(row) for row in self.render_screen(charset, cell_width, cell_height, force_corners)]
 
     def render(self, charset: Charset = ascii_charset, cell_width: int = 3, cell_height: int = 1, force_corners: bool = True) -> str:
         """Render the maze as text"""
-        return '\n'.join(self.render_lines(charset, cell_width, cell_height, force_corners)) + '\n'
+        return '\n'.join(''.join(row) for row in self.render_screen(charset, cell_width, cell_height, force_corners)) + '\n'
 
     def _validate(self):
         """Raises an exception if the maze is not enclosed by walls or if 2 adjacent cells disagree on their shared wall"""
