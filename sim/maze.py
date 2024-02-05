@@ -149,6 +149,10 @@ class Direction(IntEnum):
             case Direction.NORTH: return 270
             case Direction.NORTH_EAST: return 315
 
+    def to_radians(self) -> float:
+        """Get the rotation radians. EAST is 0, angles increase clockwise."""
+        return math.radians(self.to_degrees())
+
     def __or__(self, other: Self | int) -> Self:
         return type(self)(super().__or__(other))
 
