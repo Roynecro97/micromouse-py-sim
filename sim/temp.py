@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from os import environ
 
+from datetime import datetime, timedelta
+from os import environ
 from typing import Iterable
 
 import numpy as np
@@ -146,17 +147,29 @@ def _main():
 
     robot = Robot((0, 0), Direction.NORTH)
 
+    step_min_delay = timedelta(milliseconds=100)
+    step_delay = timedelta(seconds=1)
+    last_step = datetime.now()
+
     running = True
     while running:
+        step = False
+        now = datetime.now()
+
+        if pygame.key.get_pressed()[pygame.K_SPACE]:
+            step = now - last_step >= step_min_delay
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    sim.step()
-                    print(f"pygame: after step - {sim.maze[sim.robot_pos[:-1]]=} {sim.robot_maze[sim.robot_pos[:-1]]=}")
                 if event.key in (pygame.K_q, pygame.K_ESCAPE):
                     running = False
+
+        if step or now - last_step >= step_delay:
+            sim.step()
+            last_step = now
+            print(f"pygame: after step - {sim.maze[sim.robot_pos[:-1]]=} {sim.robot_maze[sim.robot_pos[:-1]]=}")
 
         screen.fill("black")
         draw_text(screen, 'Full Maze', 40, (250, 40))
