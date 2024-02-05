@@ -13,14 +13,14 @@ import re
 from enum import auto, Enum, Flag, IntEnum
 from functools import reduce
 from operator import or_
-from typing import cast, TYPE_CHECKING
+from typing import cast, overload, TYPE_CHECKING
 
 import numpy as np
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from os import PathLike
-    from typing import BinaryIO, Callable, Literal, Self, TextIO, TypeAlias
+    from typing import Any, BinaryIO, Callable, Literal, Self, TextIO, TypeAlias
 
 MazeSize: TypeAlias = "tuple[int, int]"
 
@@ -31,6 +31,23 @@ class RelativeDirection(Enum):
     BACK = auto()
     LEFT = auto()
     RIGHT = auto()
+
+    @overload
+    def invert(self: Literal[FRONT]) -> Literal[BACK]: ...
+    @overload
+    def invert(self: Literal[BACK]) -> Literal[FRONT]: ...
+    @overload
+    def invert(self: Literal[LEFT]) -> Literal[RIGHT]: ...
+    @overload
+    def invert(self: Literal[RIGHT]) -> Literal[LEFT]: ...
+
+    def invert(self) -> RelativeDirection:
+        """Invert the direction (left <-> right; front <-> back)"""
+        match self:
+            case RelativeDirection.FRONT: return RelativeDirection.BACK
+            case RelativeDirection.BACK: return RelativeDirection.FRONT
+            case RelativeDirection.LEFT: return RelativeDirection.RIGHT
+            case RelativeDirection.RIGHT: return RelativeDirection.LEFT
 
 
 class Direction(IntEnum):
