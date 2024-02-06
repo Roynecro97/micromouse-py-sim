@@ -85,30 +85,6 @@ class MazeRenderer:
         pygame.draw.line(screen, cls.robot_second_color, robot_pos, heading_point, 5)
 
 
-class Robot:
-    def __init__(self, start_pos: tuple[int, int], start_heading: Direction = Direction.NORTH):
-        self.pos: tuple[int, int] = start_pos
-        self.heading: Direction = start_heading
-
-    def move_forward(self):
-        self.pos = (self.pos[0] + round(np.cos(self.heading.to_radians())),
-                    self.pos[1] + round(np.sin(self.heading.to_radians())))
-
-    def move_reverse(self):
-        self.pos = (self.pos[0] - round(np.cos(self.heading.to_radians())),
-                    self.pos[1] - round(np.sin(self.heading.to_radians())))
-
-    def turn_left(self):
-        self.heading = self.heading.turn_left()
-
-    def turn_right(self):
-        self.heading = self.heading.turn_right()
-
-    def try_move_forward(self, maze: Maze):
-        self.pos = (self.pos[0] + round(np.cos(self.heading.to_radians())),
-                    self.pos[1] + round(np.sin(self.heading.to_radians())))
-
-
 def draw_text(screen: pygame.surface.Surface, text: str, size: int, center: tuple[int, int], color='white'):
     """TODO: docs"""
     font = pygame.font.Font(pygame.font.get_default_font(), size)
@@ -145,8 +121,6 @@ def _main():
 
     full_maze_offset = (20, 100)
     robot_maze_offset = (720, 100)
-
-    robot = Robot((0, 0), Direction.NORTH)
 
     step_min_delay = timedelta(milliseconds=100)
     step_delay = timedelta(seconds=0.5)
