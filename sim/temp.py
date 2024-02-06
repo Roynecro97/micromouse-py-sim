@@ -8,7 +8,7 @@ from typing import Iterable
 import numpy as np
 
 from .maze import Maze, Walls, Direction, RelativeDirection
-from .simulator import Simulator, SimulationStatus, random_robot, wall_follower_robot
+from .simulator import Simulator, SimulationStatus, random_robot, wall_follower_robot, idle_robot
 
 # Disable the prompt triggered by importing `pygame`.
 # autopep8: off
@@ -110,6 +110,7 @@ class Robot:
 
 
 def draw_text(screen: pygame.surface.Surface, text: str, size: int, center: tuple[int, int], color='white'):
+    """TODO: docs"""
     font = pygame.font.Font(pygame.font.get_default_font(), size)
     text = font.render(text, True, color)
     textRect = text.get_rect()
@@ -132,7 +133,7 @@ def _main():
     #     b'\x0E\x0D\x05\x05\x06'
     # )
     sim = Simulator(
-        alg=wall_follower_robot(RelativeDirection.RIGHT),
+        alg=idle_robot,
         maze=Maze.from_file('mazes/simple.maze'),
         begin=(0, 0, Direction.SOUTH),
         end={(1, 2)},
@@ -148,7 +149,7 @@ def _main():
     robot = Robot((0, 0), Direction.NORTH)
 
     step_min_delay = timedelta(milliseconds=100)
-    step_delay = timedelta(seconds=1)
+    step_delay = timedelta(seconds=0.5)
     last_step = datetime.now()
 
     running = True
@@ -163,10 +164,23 @@ def _main():
             if event.type == pygame.QUIT:
                 running = False
             if event.type == pygame.KEYDOWN:
+                if event.key in (pygame.K_r, pygame.K_l):
+                    match (event.key, event.mod & pygame.KMOD_SHIFT != 0):
+                        case (pygame.K_r, True): sim.restart(random_robot)
+                        case (pygame.K_r, _): sim.restart(wall_follower_robot(RelativeDirection.RIGHT))
+                        case (pygame.K_l, _): sim.restart(wall_follower_robot(RelativeDirection.LEFT))
+                    step = False
+                    last_step = now
                 if event.key in (pygame.K_q, pygame.K_ESCAPE):
                     running = False
 
-        if step or now - last_step >= step_delay:
+        if now - last_step >= step_delay:
+            step = True
+
+        if sim.status in (SimulationStatus.ERROR, SimulationStatus.FINISHED):
+            step = False
+
+        if step:
             sim.step()
             last_step = now
             print(f"pygame: after step - {sim.maze[sim.robot_pos[:-1]]=} {sim.robot_maze[sim.robot_pos[:-1]]=}")

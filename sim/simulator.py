@@ -110,6 +110,18 @@ def direction_to_wall(direction: Direction) -> Walls:
         case _: raise ValueError(f"can only convert the primary directions (not {direction})")
 
 
+def idle_robot(maze: Maze, goals: set[tuple[int, int]]) -> Robot:
+    """A robot with random movements.
+
+    Returns:
+        Robot: The robot's brain.
+    """
+    _ = maze
+    _ = goals
+    yield Action.READY
+
+
+
 def random_robot(maze: Maze, goals: set[tuple[int, int]]) -> Robot:
     """A robot with random movements.
 

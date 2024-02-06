@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from typing import Any, BinaryIO, Callable, Literal, Self, TextIO, TypeAlias
 
 MazeSize: TypeAlias = "tuple[int, int]"
+AnyPath: TypeAlias = os.PathLike | str | bytes
 
 
 class RelativeDirection(Enum):
@@ -333,7 +334,7 @@ class Maze:
         return cls(height, width, _cells=bytearray(Walls.all().to_bytes() * size), _validate=False)
 
     @classmethod
-    def from_maz_file(cls, maz: PathLike | BinaryIO, size: MazeSize | None = None) -> Self:
+    def from_maz_file(cls, maz: AnyPath | BinaryIO, size: MazeSize | None = None) -> Self:
         """
         Load a maze from a .maz file.
 
@@ -347,7 +348,7 @@ class Maze:
             If not provided, the file size must either be a square size (will be detected from the content length)
             or specified in the file name in a "name.{height}x{width}.maz" format.
         """
-        if isinstance(maz, (os.PathLike, str, bytes)):
+        if isinstance(maz, AnyPath):
             maz = open(maz, "rb")
 
         with maz:
@@ -384,7 +385,7 @@ class Maze:
         return cls(height, width, _cells=bytearray(data))
 
     @classmethod
-    def from_num_file(cls, num_file: PathLike | TextIO, size: MazeSize | None = None) -> Self:
+    def from_num_file(cls, num_file: AnyPath | TextIO, size: MazeSize | None = None) -> Self:
         """
         Load a maze from a .num file or file-like object.
 
@@ -407,7 +408,7 @@ class Maze:
         else:
             cells = []
 
-        if isinstance(num_file, (os.PathLike, str, bytes)):
+        if isinstance(num_file, AnyPath):
             num_file = open(num_file, "rt", encoding="ASCII")
 
         with num_file:
@@ -450,7 +451,7 @@ class Maze:
         return cls(height, width, _cells=bytearray(data))
 
     @classmethod
-    def from_maze_file(cls, maze_file: PathLike | TextIO, cell_height: int = 1, cell_width: int = 3, empty: str = ' ') -> Self:
+    def from_maze_file(cls, maze_file: AnyPath | TextIO, cell_height: int = 1, cell_width: int = 3, empty: str = ' ') -> Self:
         """
         Load a maze from a file or file-like object.
 
@@ -458,7 +459,7 @@ class Maze:
             A text drawing of the maze.
             TODO: add format explanation and links
         """
-        if isinstance(maze_file, (os.PathLike, str, bytes)):
+        if isinstance(maze_file, AnyPath):
             maze_file = open(maze_file, "rt", encoding="ASCII")
 
         with maze_file:
@@ -532,7 +533,7 @@ class Maze:
     }
 
     @classmethod
-    def from_csv_file(cls, csv_file: PathLike | TextIO) -> Self:
+    def from_csv_file(cls, csv_file: AnyPath | TextIO) -> Self:
         """
         Load a maze from a csv file or file-like object.
 
@@ -540,7 +541,7 @@ class Maze:
             A csv where each row has the cells for the corresponding row
             TODO: add format explanation and links
         """
-        if isinstance(csv_file, (os.PathLike, str, bytes)):
+        if isinstance(csv_file, AnyPath):
             csv_file = open(csv_file, "rt", encoding="ASCII")
 
         with csv_file:
@@ -578,7 +579,7 @@ class Maze:
         return cls(height, width, _cells=data)
 
     @classmethod
-    def from_file(cls, maze_file: PathLike, fmt: Literal['maz', 'num', 'csv', 'maze', None] = None) -> Self:
+    def from_file(cls, maze_file: AnyPath, fmt: Literal['maz', 'num', 'csv', 'maze', None] = None) -> Self:
         """
         Load a maze from a file or file-like object.
         If format is ``None``, it is detected from the extension:
