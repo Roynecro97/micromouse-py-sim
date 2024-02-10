@@ -19,10 +19,10 @@ import numpy as np
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from os import PathLike
-    from typing import Any, BinaryIO, Callable, Literal, Self, TextIO, TypeAlias
+    from typing import BinaryIO, Callable, Literal, Self, TextIO, TypeAlias
 
-MazeSize: TypeAlias = "tuple[int, int]"
+type MazeSize = tuple[int, int]
+
 AnyPath: TypeAlias = os.PathLike | str | bytes
 
 
@@ -350,6 +350,8 @@ class Maze:
         """
         if isinstance(maz, AnyPath):
             maz = open(maz, "rb")
+        elif isinstance(maz, bytearray | memoryview):
+            raise TypeError(f"expected str, bytes, path-like or file-like. not {type(maz).__name__}")
 
         with maz:
             data = maz.read()
@@ -410,6 +412,8 @@ class Maze:
 
         if isinstance(num_file, AnyPath):
             num_file = open(num_file, "rt", encoding="ASCII")
+        elif isinstance(num_file, bytearray | memoryview):
+            raise TypeError(f"expected str, bytes, path-like or file-like. not {type(num_file).__name__}")
 
         with num_file:
             for line in num_file:
@@ -461,6 +465,8 @@ class Maze:
         """
         if isinstance(maze_file, AnyPath):
             maze_file = open(maze_file, "rt", encoding="ASCII")
+        elif isinstance(maze_file, bytearray | memoryview):
+            raise TypeError(f"expected str, bytes, path-like or file-like. not {type(maze_file).__name__}")
 
         with maze_file:
             maze = maze_file.read()
@@ -543,6 +549,8 @@ class Maze:
         """
         if isinstance(csv_file, AnyPath):
             csv_file = open(csv_file, "rt", encoding="ASCII")
+        elif isinstance(csv_file, bytearray | memoryview):
+            raise TypeError(f"expected str, bytes, path-like or file-like. not {type(csv_file).__name__}")
 
         with csv_file:
             csv = csv_file.read()
