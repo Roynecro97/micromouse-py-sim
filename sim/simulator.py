@@ -2,6 +2,7 @@
 """
 from __future__ import annotations
 
+import os
 import random
 
 from enum import auto, Enum
@@ -13,8 +14,10 @@ if TYPE_CHECKING:
     from collections.abc import Generator
     from typing import Callable, Iterable, Literal
 
+ENABLE_VICTORY_DANCE = os.environ.get('MICROMOUSE_VICTORY_DANCE', 'n') == 'y'
 
 # TODO: replace prints with logging
+
 
 class Action(Enum):
     """TODO: docs"""
@@ -83,8 +86,9 @@ class RobotState(NamedTuple):
 # RobotState: TypeAlias = "tuple[int, int, Direction, Walls]"
 
 
-Robot: TypeAlias = "Generator[Action, RobotState, None]"
-Algorithm: TypeAlias = "Callable[[Maze, set[tuple[int, int]]], Robot]"
+if TYPE_CHECKING:
+    type Robot = Generator[Action, RobotState, None]
+    type Algorithm = Callable[[Maze, set[tuple[int, int]]], Robot]
 
 
 def _wall_to_direction(wall: Walls) -> Direction:
@@ -163,9 +167,9 @@ def random_robot(maze: Maze, goals: set[tuple[int, int]]) -> Robot:
         pos_row, pos_col, facing = yield action
 
     print("randomouse: victory")
-    # # Victory dance
-    # while True:
-    #     yield random.choice((Action.TURN_LEFT, Action.TURN_RIGHT))
+    # Victory dance
+    while ENABLE_VICTORY_DANCE:
+        yield random.choice((Action.TURN_LEFT, Action.TURN_RIGHT))
 
 
 def _wall_follower_robot(maze: Maze, goals: set[tuple[int, int]], *
@@ -208,9 +212,9 @@ def _wall_follower_robot(maze: Maze, goals: set[tuple[int, int]], *
 
         pos_row, pos_col, facing = yield Action.FORWARD
 
-    # # Victory spin
-    # while True:
-    #     yield turn_action
+    # Victory spin
+    while ENABLE_VICTORY_DANCE:
+        yield Action.from_rel_direction(follow)
 
 
 def wall_follower_robot(follow: Literal[RelativeDirection.LEFT, RelativeDirection.RIGHT]) -> Algorithm:
