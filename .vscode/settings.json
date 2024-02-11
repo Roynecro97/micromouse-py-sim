@@ -9,5 +9,15 @@
         "-aaa"
     ],
     "pylint.importStrategy": "fromEnvironment",
-    "autopep8.importStrategy": "fromEnvironment"
+    "pylint.args": [
+        "--extension-pkg-whitelist=pygame"
+    ],
+    "autopep8.importStrategy": "fromEnvironment",
+    "cSpell.words": [
+        "dtype",
+        "dtypes",
+        "KMOD",
+        "ndarray",
+        "pygame"
+    ]
 }

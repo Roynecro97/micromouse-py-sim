@@ -10,18 +10,45 @@ import math
 import os
 import re
 
-from enum import Flag, IntEnum
+from enum import auto, Enum, Flag, IntEnum
 from functools import reduce
 from operator import or_
-from typing import cast, TYPE_CHECKING
+from typing import cast, overload, TYPE_CHECKING
 
 import numpy as np
 
 if TYPE_CHECKING:
-    from os import PathLike
+    from collections.abc import Iterator
     from typing import BinaryIO, Callable, Literal, Self, TextIO, TypeAlias
 
-MazeSize: TypeAlias = "tuple[int, int]"
+type MazeSize = tuple[int, int]
+
+AnyPath: TypeAlias = os.PathLike | str | bytes
+
+
+class RelativeDirection(Enum):
+    """Relative directions."""
+    FRONT = auto()
+    BACK = auto()
+    LEFT = auto()
+    RIGHT = auto()
+
+    @overload
+    def invert(self: Literal[FRONT]) -> Literal[BACK]: ...
+    @overload
+    def invert(self: Literal[BACK]) -> Literal[FRONT]: ...
+    @overload
+    def invert(self: Literal[LEFT]) -> Literal[RIGHT]: ...
+    @overload
+    def invert(self: Literal[RIGHT]) -> Literal[LEFT]: ...
+
+    def invert(self) -> RelativeDirection:
+        """Invert the direction (left <-> right; front <-> back)"""
+        match self:
+            case RelativeDirection.FRONT: return RelativeDirection.BACK
+            case RelativeDirection.BACK: return RelativeDirection.FRONT
+            case RelativeDirection.LEFT: return RelativeDirection.RIGHT
+            case RelativeDirection.RIGHT: return RelativeDirection.LEFT
 
 
 class Direction(IntEnum):
@@ -94,6 +121,38 @@ class Direction(IntEnum):
             case Direction.NORTH_WEST: return Direction.NORTH
             case Direction.SOUTH_EAST: return Direction.SOUTH
             case Direction.SOUTH_WEST: return Direction.WEST
+
+    def turn(self, rel: RelativeDirection) -> Direction:
+        """Return the direction that is the result of turning in the provided relative direction."""
+        match rel:
+            case RelativeDirection.FRONT: return self
+            case RelativeDirection.BACK: return self.turn_back()
+            case RelativeDirection.LEFT: return self.turn_left()
+            case RelativeDirection.RIGHT: return self.turn_right()
+
+    def half_turn(self, rel: RelativeDirection) -> Direction:
+        """Return the direction that is the result of half a turn in the provided relative direction."""
+        match rel:
+            case RelativeDirection.FRONT: return self
+            case RelativeDirection.BACK: raise ValueError("cannot half turn back")
+            case RelativeDirection.LEFT: return self.half_turn_left()
+            case RelativeDirection.RIGHT: return self.half_turn_right()
+
+    def to_degrees(self) -> Literal[0, 45, 90, 135, 180, 225, 270, 315]:  # pylint: disable=too-many-return-statements
+        """Get the rotation degrees. EAST is 0 deg, degrees increase clockwise."""
+        match self:
+            case Direction.EAST: return 0
+            case Direction.SOUTH_EAST: return 45
+            case Direction.SOUTH: return 90
+            case Direction.SOUTH_WEST: return 135
+            case Direction.WEST: return 180
+            case Direction.NORTH_WEST: return 225
+            case Direction.NORTH: return 270
+            case Direction.NORTH_EAST: return 315
+
+    def to_radians(self) -> float:
+        """Get the rotation radians. EAST is 0, angles increase clockwise."""
+        return math.radians(self.to_degrees())
 
     def __or__(self, other: Self | int) -> Self:
         return type(self)(super().__or__(other))
@@ -275,7 +334,7 @@ class Maze:
         return cls(height, width, _cells=bytearray(Walls.all().to_bytes() * size), _validate=False)
 
     @classmethod
-    def from_maz_file(cls, maz: PathLike | BinaryIO, size: MazeSize | None = None) -> Self:
+    def from_maz_file(cls, maz: AnyPath | BinaryIO, size: MazeSize | None = None) -> Self:
         """
         Load a maze from a .maz file.
 
@@ -289,8 +348,10 @@ class Maze:
             If not provided, the file size must either be a square size (will be detected from the content length)
             or specified in the file name in a "name.{height}x{width}.maz" format.
         """
-        if isinstance(maz, os.PathLike):
+        if isinstance(maz, AnyPath):
             maz = open(maz, "rb")
+        elif isinstance(maz, bytearray | memoryview):
+            raise TypeError(f"expected str, bytes, path-like or file-like. not {type(maz).__name__}")
 
         with maz:
             data = maz.read()
@@ -326,7 +387,7 @@ class Maze:
         return cls(height, width, _cells=bytearray(data))
 
     @classmethod
-    def from_num_file(cls, num_file: PathLike | TextIO, size: MazeSize | None = None) -> Self:
+    def from_num_file(cls, num_file: AnyPath | TextIO, size: MazeSize | None = None) -> Self:
         """
         Load a maze from a .num file or file-like object.
 
@@ -349,8 +410,10 @@ class Maze:
         else:
             cells = []
 
-        if isinstance(num_file, os.PathLike):
+        if isinstance(num_file, AnyPath):
             num_file = open(num_file, "rt", encoding="ASCII")
+        elif isinstance(num_file, bytearray | memoryview):
+            raise TypeError(f"expected str, bytes, path-like or file-like. not {type(num_file).__name__}")
 
         with num_file:
             for line in num_file:
@@ -392,7 +455,7 @@ class Maze:
         return cls(height, width, _cells=bytearray(data))
 
     @classmethod
-    def from_maze_file(cls, maze_file: PathLike | TextIO, cell_height: int = 1, cell_width: int = 3, empty: str = ' ') -> Self:
+    def from_maze_file(cls, maze_file: AnyPath | TextIO, cell_height: int = 1, cell_width: int = 3, empty: str = ' ') -> Self:
         """
         Load a maze from a file or file-like object.
 
@@ -400,8 +463,10 @@ class Maze:
             A text drawing of the maze.
             TODO: add format explanation and links
         """
-        if isinstance(maze_file, os.PathLike):
+        if isinstance(maze_file, AnyPath):
             maze_file = open(maze_file, "rt", encoding="ASCII")
+        elif isinstance(maze_file, bytearray | memoryview):
+            raise TypeError(f"expected str, bytes, path-like or file-like. not {type(maze_file).__name__}")
 
         with maze_file:
             maze = maze_file.read()
@@ -474,7 +539,7 @@ class Maze:
     }
 
     @classmethod
-    def from_csv_file(cls, csv_file: PathLike | TextIO) -> Self:
+    def from_csv_file(cls, csv_file: AnyPath | TextIO) -> Self:
         """
         Load a maze from a csv file or file-like object.
 
@@ -482,8 +547,10 @@ class Maze:
             A csv where each row has the cells for the corresponding row
             TODO: add format explanation and links
         """
-        if isinstance(csv_file, os.PathLike):
+        if isinstance(csv_file, AnyPath):
             csv_file = open(csv_file, "rt", encoding="ASCII")
+        elif isinstance(csv_file, bytearray | memoryview):
+            raise TypeError(f"expected str, bytes, path-like or file-like. not {type(csv_file).__name__}")
 
         with csv_file:
             csv = csv_file.read()
@@ -520,7 +587,7 @@ class Maze:
         return cls(height, width, _cells=data)
 
     @classmethod
-    def from_file(cls, maze_file: PathLike, fmt: Literal['maz', 'num', 'csv', 'maze', None] = None) -> Self:
+    def from_file(cls, maze_file: AnyPath, fmt: Literal['maz', 'num', 'csv', 'maze', None] = None) -> Self:
         """
         Load a maze from a file or file-like object.
         If format is ``None``, it is detected from the extension:
@@ -571,9 +638,12 @@ class Maze:
 
     def get[T](self, row: int, col: int, default: T = None) -> Walls | T:
         """Get a cell from the maze, or ``default`` if it doesn't exist."""
-        cell = self._index(row, col)
-        if cell >= self.cell_size:
+        if row >= self.height or col >= self.width:
             return default
+        cell = self._index(row, col)
+        assert cell < self.cell_size, f"bad cell calculation for {self.size=}, ({row=}, {col=}), {cell=}"
+        # if cell >= self.cell_size:
+        #     return default
         return Walls(self._cells[cell])
 
     def __getitem__(self, idx: tuple[int, int]) -> Walls:
@@ -622,13 +692,13 @@ class Maze:
         for added in walls:
             match added:
                 case Walls.NORTH if row > 0:
-                    self._cells[self._index(row - 1, col)] |= Walls.NORTH.value
+                    self._cells[self._index(row - 1, col)] |= Walls.SOUTH.value
                 case Walls.EAST if col < self.width - 1:
-                    self._cells[self._index(row, col + 1)] |= Walls.EAST.value
+                    self._cells[self._index(row, col + 1)] |= Walls.WEST.value
                 case Walls.SOUTH if row < self.height - 1:
-                    self._cells[self._index(row + 1, col)] |= Walls.SOUTH.value
+                    self._cells[self._index(row + 1, col)] |= Walls.NORTH.value
                 case Walls.WEST if col > 0:
-                    self._cells[self._index(row, col - 1)] |= Walls.WEST.value
+                    self._cells[self._index(row, col - 1)] |= Walls.EAST.value
 
     def remove_walls(self, row: int, col: int, walls: Walls):
         """Remove walls from the maze."""
@@ -642,28 +712,42 @@ class Maze:
                 case Walls.NORTH:
                     if row == 0:
                         raise ValueError("cannot remove the NORTH wall from the top row")
-                    self._cells[self._index(row - 1, col)] &= (~Walls.NORTH).value
+                    self._cells[self._index(row - 1, col)] &= (~Walls.SOUTH).value
                 case Walls.EAST:
                     if col == self.width - 1:
                         raise ValueError("cannot remove the EAST wall from the rightmost column")
-                    self._cells[self._index(row, col + 1)] &= (~Walls.EAST).value
+                    self._cells[self._index(row, col + 1)] &= (~Walls.WEST).value
                 case Walls.SOUTH:
                     if row == self.height - 1:
                         raise ValueError("cannot remove the SOUTH wall from the bottom row")
-                    self._cells[self._index(row + 1, col)] &= (~Walls.SOUTH).value
+                    self._cells[self._index(row + 1, col)] &= (~Walls.NORTH).value
                 case Walls.WEST:
                     if col == 0:
                         raise ValueError("cannot remove the WEST wall from the leftmost column")
-                    self._cells[self._index(row, col - 1)] &= (~Walls.WEST).value
+                    self._cells[self._index(row, col - 1)] &= (~Walls.EAST).value
 
-    def render_lines(
+    def __iter__(self) -> Iterator[tuple[int, int, Walls]]:
+        """Iterate over the cells in the maze, with indexes.
+
+        Returns:
+            Iterator: An iterator over the cells and their indexes.
+
+        Yields:
+            (int, int, Walls): A (row, col, walls) tuple.
+        """
+        return ((*divmod(idx, self.width), Walls(cell)) for idx, cell in enumerate(self._cells))
+
+    # A maze is not a container: ``Walls.NORTH in maze`` should not work.
+    __contains__ = None
+
+    def render_screen(
             self,
             charset: Charset = ascii_charset,
             cell_width: int = 3,
             cell_height: int = 1,
             force_corners: bool = True,
-    ) -> list[str]:
-        """Render the maze as text (in separate lines)"""
+    ) -> np.ndarray[tuple[int, int], np.dtypes.StrDType]:
+        """Render the maze as text (in a numpy 2D array)"""
         screen = np.array([[' ' for _ in range(self.width * (cell_width + 1) + 1)] for _ in range(self.height * (cell_height + 1) + 1)])
         bottom_row = self.height * (cell_height + 1)
         rightmost_col = self.width * (cell_width + 1)
@@ -712,11 +796,21 @@ class Maze:
             screen[top_row + 1:top_row + 1 + cell_height, rightmost_col] = charset(LineDirection.VERTICAL)
             if row == self.height - 1:
                 screen[bottom_row, rightmost_col] = charset(LineDirection.UP | LineDirection.LEFT)
-        return [''.join(row) for row in screen]
+        return screen
+
+    def render_lines(
+            self,
+            charset: Charset = ascii_charset,
+            cell_width: int = 3,
+            cell_height: int = 1,
+            force_corners: bool = True,
+    ) -> list[str]:
+        """Render the maze as text (in separate lines)"""
+        return [''.join(row) for row in self.render_screen(charset, cell_width, cell_height, force_corners)]
 
     def render(self, charset: Charset = ascii_charset, cell_width: int = 3, cell_height: int = 1, force_corners: bool = True) -> str:
         """Render the maze as text"""
-        return '\n'.join(self.render_lines(charset, cell_width, cell_height, force_corners)) + '\n'
+        return '\n'.join(''.join(row) for row in self.render_screen(charset, cell_width, cell_height, force_corners)) + '\n'
 
     def _validate(self):
         """Raises an exception if the maze is not enclosed by walls or if 2 adjacent cells disagree on their shared wall"""
