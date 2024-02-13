@@ -16,8 +16,10 @@
     "cSpell.words": [
         "dtype",
         "dtypes",
+        "frompyfunc",
         "KMOD",
         "ndarray",
+        "nout",
         "pygame"
     ]
 }
