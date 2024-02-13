@@ -12,7 +12,7 @@ from .maze import Direction, ExtendedMaze, Maze, RelativeDirection, Walls
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Generator
-    from typing import Callable, Literal, Self
+    from typing import Callable, Literal
 
     from .maze import ExtraCellInfo
 
@@ -85,20 +85,6 @@ class RobotState(NamedTuple):
     row: int
     col: int
     facing: Direction
-
-
-class Position(NamedTuple):
-    """TODO: docs
-
-    Represents the current robot's state
-    """
-    row: int
-    col: int
-
-    def __add__(self, other: object) -> Self:
-        if not isinstance(other, type(self)):
-            return NotImplemented
-        return type(self)(self.row + other.row, self.col + other.col)
 
 
 if TYPE_CHECKING:
@@ -383,7 +369,7 @@ class SimulationStatus(Enum):
 class Simulator:
     """A micromouse simulator."""
     _status: SimulationStatus
-    _robot_pos: tuple[int, int, Direction]
+    __robot_pos: tuple[int, int, Direction]
 
     def __init__(self, alg: Algorithm, maze: Maze, begin: tuple[int, int, Direction], end: Iterable[tuple[int, int]]):
         self._maze = ExtendedMaze.full_from_maze(maze)
@@ -398,7 +384,6 @@ class Simulator:
         self._maze.reset_info()
         self._robot_maze = ExtendedMaze.empty(self._maze.height, self.maze.width)
         self._robot_pos = self._begin
-        self._robot_maze[self._robot_pos[:-1]] = self._maze[self._robot_pos[:-1]]
 
         self._robot = alg(self._robot_maze, self._end)
 
@@ -490,16 +475,22 @@ class Simulator:
             case Direction.WEST: self._robot_pos = (row, col - 1, facing)
             case _: raise AssertionError(f"only the primary directions are supported right now (not {direction})")
 
-        robot_pos = self._robot_pos[:-1]
-        self._robot_maze[robot_pos] = self._maze[robot_pos]
+        print(f"sim: robot is now at {self._robot_pos[:-1]} facing {self._robot_pos[-1]}")
+        return True
 
+    @property
+    def _robot_pos(self) -> tuple[int, int, Direction]:
+        return self.__robot_pos
+
+    @_robot_pos.setter
+    def _robot_pos(self, new_pos: tuple[int, int, Direction]):
+        self.__robot_pos = new_pos
+
+        robot_pos = self.__robot_pos[:-1]
+        self._robot_maze[robot_pos] = self._maze[robot_pos]
         self._robot_maze.extra_info[robot_pos].visit_cell()
         info: ExtraCellInfo = self._maze.extra_info[robot_pos]
         info.visit_cell()
-        info.color = 'red'  # TODO: replace placeholder with an actual heatmap
-
-        print(f"sim: robot is now at {self._robot_pos[:-1]} facing {self._robot_pos[-1]}")
-        return True
 
     @property
     def maze(self) -> ExtendedMaze:  # TODO: readonly version
