@@ -10,6 +10,7 @@ import math
 import os
 import re
 
+from dataclasses import dataclass
 from enum import auto, Enum, Flag, IntEnum
 from functools import reduce
 from operator import or_
@@ -18,8 +19,14 @@ from typing import cast, overload, TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterable, Iterator
     from typing import BinaryIO, Callable, Literal, Self, TextIO, TypeAlias
+
+    import numpy.typing as npt
+
+    NumpyCheat = np.generic
+else:
+    NumpyCheat = object
 
 type MazeSize = tuple[int, int]
 
@@ -332,6 +339,11 @@ class Maze:
             raise ValueError(f"invalid dimensions ({height}, {width}), 0 isn't allowed")
 
         return cls(height, width, _cells=bytearray(Walls.all().to_bytes() * size), _validate=False)
+
+    @classmethod
+    def full_from_maze(cls, maze: Maze) -> Self:
+        """Create a new full maze from the provided maze."""
+        return cls(maze._height, maze._width, _cells=bytearray(maze._cells), _validate=False)  # pylint: disable=protected-access
 
     @classmethod
     def from_maz_file(cls, maz: AnyPath | BinaryIO, size: MazeSize | None = None) -> Self:
@@ -798,16 +810,6 @@ class Maze:
                 screen[bottom_row, rightmost_col] = charset(LineDirection.UP | LineDirection.LEFT)
         return screen
 
-    def render_lines(
-            self,
-            charset: Charset = ascii_charset,
-            cell_width: int = 3,
-            cell_height: int = 1,
-            force_corners: bool = True,
-    ) -> list[str]:
-        """Render the maze as text (in separate lines)"""
-        return [''.join(row) for row in self.render_screen(charset, cell_width, cell_height, force_corners)]
-
     def render(self, charset: Charset = ascii_charset, cell_width: int = 3, cell_height: int = 1, force_corners: bool = True) -> str:
         """Render the maze as text"""
         return '\n'.join(''.join(row) for row in self.render_screen(charset, cell_width, cell_height, force_corners)) + '\n'
@@ -841,3 +843,85 @@ class Maze:
                     raise ValueError(f"missing WEST wall at ({row}, {col})")
                 # if Walls.EAST in Walls(self._cells[idx - 1]):
                 #     raise ValueError(f"disagreeing cells ({row}, {col}) and ({row}, {col - 1})")
+
+
+@dataclass(kw_only=True, slots=True)
+class ExtraCellInfo(NumpyCheat):
+    """Holds additional information per cell managed by the robot/simulation."""
+    weight: float | None = None
+    color: tuple[int, int, int] | str | None = None  # Maybe a better type here
+    visited: int = 0
+
+    def visit_cell(self):
+        """Increase the visit counter for the cell."""
+        self.visited += 1
+
+
+if TYPE_CHECKING:
+    type Step = tuple[int, int]
+    type Route = list[Step]
+    type RouteLike = Iterable[Step] | None
+
+
+class ExtendedMaze(Maze):
+    """A class representing a maze with additional solving information."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        self._route: Route = []
+        self._extra_info: npt.NDArray[ExtraCellInfo] = np.empty(self.size, dtype=ExtraCellInfo)
+        self.reset_info()
+
+    def reset_info(self):
+        """Reset the extra info held in the maze."""
+        for row in range(self.height):
+            for col in range(self.width):
+                self._extra_info[row, col] = ExtraCellInfo()
+
+    @property
+    def extra_info(self) -> npt.NDArray[ExtraCellInfo]:
+        """Return an array-like for storing extra info about cells in the maze."""
+        return self._extra_info
+
+    @extra_info.deleter
+    def extra_info(self):
+        """Reset the extra info."""
+        self.reset_info()
+
+    def iter_info(self) -> Iterator[tuple[int, int, ExtraCellInfo]]:
+        """Iterate over the info of the cells in the maze, with indexes.
+
+        Returns:
+            Iterator: An iterator over the cells' infos and their indexes.
+
+        Yields:
+            (int, int, ExtraCellInfo): A (row, col, info) tuple.
+        """
+        return ((row, col, self._extra_info[row, col]) for row in range(self.height) for col in range(self.width))
+
+    def iter_all(self) -> Iterator[tuple[int, int, Walls, ExtraCellInfo]]:
+        """Iterate over the cells in the maze, with indexes and info.
+
+        Returns:
+            Iterator: An iterator over the cells, their indexes and their info.
+
+        Yields:
+            (int, int, Walls, ExtraCellInfo): A (row, col, walls, info) tuple.
+        """
+        return ((row, col, Walls(cell), info) for cell, (row, col, info) in zip(self._cells, self.iter_info()))
+
+    @property
+    def route(self) -> Route:
+        """Get the route for the maze, in (row, col) pairs."""
+        return self._route
+
+    @route.setter
+    def route(self, value: RouteLike):
+        """Set the route for the maze, in (row, col) pairs."""
+        self._route = list(value or ())
+
+    @route.deleter
+    def route(self):
+        """Reset the current route."""
+        self._route = []

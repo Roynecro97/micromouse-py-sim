@@ -11,7 +11,7 @@ import operator
 import numpy as np
 
 from .maze import Maze, Walls, Direction, RelativeDirection
-from .simulator import Simulator, SimulationStatus, random_robot, wall_follower_robot, idle_robot
+from .simulator import Simulator, SimulationStatus, random_robot, wall_follower_robot, idle_robot, simple_flood_fill
 
 # Disable the prompt triggered by importing `pygame`.
 # autopep8: off
@@ -150,11 +150,12 @@ class GUIRenderer:
                     tile_size, half_tile, full_maze_offset, full_maze_center_offset, robot_maze_offset, robot_maze_center_offset = cls._scale(
                         sim.maze.width, sim.maze.height)
                 elif event.type == pygame.KEYDOWN:
-                    if event.key in (pygame.K_r, pygame.K_l):
+                    if event.key in (pygame.K_r, pygame.K_l, pygame.K_f):
                         match (event.key, event.mod & pygame.KMOD_SHIFT != 0):
                             case (pygame.K_r, True): sim.restart(random_robot)
                             case (pygame.K_r, _): sim.restart(wall_follower_robot(RelativeDirection.RIGHT))
                             case (pygame.K_l, _): sim.restart(wall_follower_robot(RelativeDirection.LEFT))
+                            case (pygame.K_f, _): sim.restart(simple_flood_fill)
                         step = False
                         last_step = now
                     if event.key in (pygame.K_q, pygame.K_ESCAPE):

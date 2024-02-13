@@ -6,13 +6,15 @@ import os
 import random
 
 from enum import auto, Enum
-from typing import NamedTuple, overload, TypeAlias, TYPE_CHECKING
+from typing import NamedTuple, overload, TYPE_CHECKING
 
-from .maze import Direction, Maze, RelativeDirection, Walls
+from .maze import Direction, ExtendedMaze, Maze, RelativeDirection, Walls
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
-    from typing import Callable, Iterable, Literal
+    from collections.abc import Iterable, Generator
+    from typing import Callable, Literal, Self
+
+    from .maze import ExtraCellInfo
 
 ENABLE_VICTORY_DANCE = os.environ.get('MICROMOUSE_VICTORY_DANCE', 'n') == 'y'
 
@@ -22,6 +24,7 @@ ENABLE_VICTORY_DANCE = os.environ.get('MICROMOUSE_VICTORY_DANCE', 'n') == 'y'
 class Action(Enum):
     """TODO: docs"""
     READY = auto()
+    RESET = auto()
     FORWARD = auto()
     BACKWARDS = auto()
     TURN_LEFT = auto()
@@ -83,12 +86,24 @@ class RobotState(NamedTuple):
     col: int
     facing: Direction
 
-# RobotState: TypeAlias = "tuple[int, int, Direction, Walls]"
+
+class Position(NamedTuple):
+    """TODO: docs
+
+    Represents the current robot's state
+    """
+    row: int
+    col: int
+
+    def __add__(self, other: object) -> Self:
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return type(self)(self.row + other.row, self.col + other.col)
 
 
 if TYPE_CHECKING:
     type Robot = Generator[Action, RobotState, None]
-    type Algorithm = Callable[[Maze, set[tuple[int, int]]], Robot]
+    type Algorithm = Callable[[ExtendedMaze, set[tuple[int, int]]], Robot]
 
 
 def _wall_to_direction(wall: Walls) -> Direction:
@@ -229,11 +244,138 @@ def wall_follower_robot(follow: Literal[RelativeDirection.LEFT, RelativeDirectio
     return _inner
 
 
+def _adjacent_cells_impl(maze: Maze, cells: Iterable[tuple[int, int]]) -> Iterable[tuple[int, int]]:
+    for row, col in cells:
+        walls = maze[row, col]
+        if Walls.NORTH not in walls:
+            yield (row - 1, col)
+        if Walls.EAST not in walls:
+            yield (row, col + 1)
+        if Walls.SOUTH not in walls:
+            yield (row + 1, col)
+        if Walls.WEST not in walls:
+            yield (row, col - 1)
+
+
+def _adjacent_cells(maze: Maze, cells: Iterable[tuple[int, int]], without: set[tuple[int, int]] | None = None) -> set[tuple[int, int]]:
+    return set(_adjacent_cells_impl(maze, cells)) - (without or set())
+
+
+def _shuffled[T](lst: list[T]) -> list[T]:
+    random.shuffle(lst)
+    return lst
+
+
+def _simple_flood_fill(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot:
+    """A robot that solves the maze using a simple implementation of the flood-fill algorithm.
+
+    Returns:
+        Robot: The robot's brain.
+    """
+    def _calc_flood_fill():
+        seen = set()
+        current = goals
+        marker = 0
+        while True:
+            for cell in current:
+                info: ExtraCellInfo = maze.extra_info[cell]
+                info.weight = marker
+            marker += 1
+            seen.update(current)
+            current = _adjacent_cells(maze, current, seen)
+            if len(seen) >= maze.cell_size:
+                break
+        assert len(seen) == maze.cell_size, "new cells created"
+
+    def _visual_flood():  # TODO: delete once we have stat representation on our GUI
+        import numpy as np  # pylint: disable=import-outside-toplevel
+
+        def _weight(info: ExtraCellInfo) -> float:
+            return info.weight if info.weight is not None else -1
+
+        return np.frompyfunc(_weight, nin=1, nout=1)(maze.extra_info)
+
+    def _direction_to_cell(direction: Direction) -> tuple[int, int]:
+        match direction:
+            case Direction.NORTH: return (pos_row - 1, pos_col)
+            case Direction.EAST: return (pos_row, pos_col + 1)
+            case Direction.SOUTH: return (pos_row + 1, pos_col)
+            case Direction.WEST: return (pos_row, pos_col - 1)
+        raise ValueError(f"unsupported direction {direction}")
+
+    def _priority(direction: Direction) -> tuple[float, int]:
+        cell = maze.extra_info[_direction_to_cell(direction)]
+        return cell.weight, cell.visited
+
+    _calc_flood_fill()  # for simulation rendering before movement starts - completely redundant
+
+    pos_row, pos_col, facing = yield Action.READY
+    maze.route.append((pos_row, pos_col))
+
+    while (pos_row, pos_col) not in goals:
+        maze.extra_info[pos_row, pos_col].visit_cell()
+        _calc_flood_fill()
+        print(f"floodmouse: flooded ->\n{_visual_flood()}")
+        walls = maze[pos_row, pos_col]
+        print(f"floodmouse: at {(pos_row, pos_col)} facing {facing} with {walls}")
+        new_direction = min(
+            _shuffled(walls_to_directions(walls)),  # regular / reversed / random
+            key=_priority,
+        )
+        print(f"floodmouse: chose to flood {new_direction}")
+        if new_direction == facing:
+            print("floodmouse: will move forward")
+            action = Action.FORWARD
+        elif new_direction == facing.turn_back():
+            print("floodmouse: will move in reverse")
+            action = Action.BACKWARDS
+        else:
+            if new_direction == facing.turn_left():
+                print("floodmouse: turning left")
+                turn_action = Action.TURN_LEFT
+            elif new_direction == facing.turn_right():
+                print("floodmouse: turning right")
+                turn_action = Action.TURN_RIGHT
+            else:
+                raise AssertionError(f"invalid turn from {facing} to {new_direction}")
+            r, c, facing = yield turn_action
+            assert (r, c) == (pos_row, pos_col), "moved while turning"
+            assert maze[r, c] == walls, "walls changed while turning"
+            assert facing == new_direction, "turning failed"
+            print(f"floodmouse: now facing {facing}, will move forward")
+            action = Action.FORWARD
+        pos_row, pos_col, facing = yield action
+        maze.route.append((pos_row, pos_col))
+
+
+def simple_flood_fill(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot:
+    """A robot that solves the maze using a simple implementation of the flood-fill algorithm.
+
+    Returns:
+        Robot: The robot's brain.
+    """
+    # Initial flood-fill to the goal
+    yield from _simple_flood_fill(maze, goals)
+    # Mark the starting point as the new goal and flood-fill to get there
+    starting_pos = maze.route[0]
+    maze.extra_info[starting_pos].color = "green"
+    for goal in goals:
+        maze.extra_info[goal].color = "blue"
+    yield from _simple_flood_fill(maze, {starting_pos})
+    # Reset colors, route and orientation (but keep walls, we should be at the starting position)
+    maze.reset_info()
+    del maze.route
+    yield Action.RESET
+    # Do the actual fast route
+    yield from _simple_flood_fill(maze, goals)
+
+
 class SimulationStatus(Enum):
     """TODO"""
 
     READY = auto()
     IN_PROGRESS = auto()
+    IN_PROGRESS_FOUND_DEST = auto()
     FINISHED = auto()
     ERROR = auto()
 
@@ -244,7 +386,7 @@ class Simulator:
     _robot_pos: tuple[int, int, Direction]
 
     def __init__(self, alg: Algorithm, maze: Maze, begin: tuple[int, int, Direction], end: Iterable[tuple[int, int]]):
-        self._maze = maze
+        self._maze = ExtendedMaze.full_from_maze(maze)
         self._begin = begin
         self._end = set(end)
         self.restart(alg)
@@ -253,7 +395,8 @@ class Simulator:
         """Restart the simulator."""
         print(f"sim: restarting with a {self.maze.height}x{self.maze.width} maze")
         print(f"sim: robot will start at {self._begin[:-1]} facing {self._begin[-1]}")
-        self._robot_maze = Maze.empty(*self._maze.size)
+        self._maze.reset_info()
+        self._robot_maze = ExtendedMaze.empty(self._maze.height, self.maze.width)
         self._robot_pos = self._begin
         self._robot_maze[self._robot_pos[:-1]] = self._maze[self._robot_pos[:-1]]
 
@@ -303,12 +446,22 @@ class Simulator:
 
         match action:
             case Action.READY:
-                self._status = SimulationStatus.ERROR
-                raise RuntimeError(f"robot malfunction - yielded {action} instead of moving")
+                pass
+                # self._status = SimulationStatus.ERROR
+                # raise RuntimeError(f"robot malfunction - yielded {action} instead of moving")
+            case Action.RESET:
+                print("sim: robot asked for reset")
+                if self._robot_pos[:-1] != self._begin[:-1] or self._status is not SimulationStatus.IN_PROGRESS_FOUND_DEST:
+                    raise RuntimeError("reset must be done from the starting position and after finding the goal")
+                self._maze.reset_info()
+                self._robot_pos = self._begin
+                self._status = SimulationStatus.READY  # Allow the robot to call ready again
             case Action.FORWARD | Action.BACKWARDS:
                 if not self._robot_step(facing if action is Action.FORWARD else facing.turn_back()):
                     print("sim: step error")
                     self._status = SimulationStatus.ERROR
+                elif self._robot_pos[:-1] in self._end:
+                    self._status = SimulationStatus.IN_PROGRESS_FOUND_DEST
             case Action.TURN_LEFT:
                 self._robot_pos = (row, col, facing.turn_left())
                 print("sim: robot turned left")
@@ -324,7 +477,7 @@ class Simulator:
 
         print(f"sim: stepping from {(row, col)} to {direction} (while facing {facing})")
 
-        if direction_to_wall(direction) in self._maze[row, col]:
+        if direction_to_wall(direction) in Walls(self._maze[row, col]):
             print(f"sim: crashed! {direction_to_wall(direction)=!s} to {self._maze[row, col]=!s}")
             # Robot crashed into a wall
             return False
@@ -337,14 +490,20 @@ class Simulator:
             case Direction.WEST: self._robot_pos = (row, col - 1, facing)
             case _: raise AssertionError(f"only the primary directions are supported right now (not {direction})")
 
-        self._robot_maze[self._robot_pos[:-1]] = self._maze[self._robot_pos[:-1]]
+        robot_pos = self._robot_pos[:-1]
+        self._robot_maze[robot_pos] = self._maze[robot_pos]
+
+        self._robot_maze.extra_info[robot_pos].visit_cell()
+        info: ExtraCellInfo = self._maze.extra_info[robot_pos]
+        info.visit_cell()
+        info.color = 'red'  # TODO: replace placeholder with an actual heatmap
 
         print(f"sim: robot is now at {self._robot_pos[:-1]} facing {self._robot_pos[-1]}")
         return True
 
     @property
-    def maze(self) -> Maze:  # TODO: readonly version
-        """The maze used for in the simulator."""
+    def maze(self) -> ExtendedMaze:  # TODO: readonly version
+        """The maze used in the simulator."""
         return self._maze
 
     @property
@@ -358,7 +517,7 @@ class Simulator:
         return self._end
 
     @property
-    def robot_maze(self) -> Maze:  # TODO: readonly version
+    def robot_maze(self) -> ExtendedMaze:  # TODO: readonly version
         """The maze that the robot sees."""
         return self._robot_maze
 
