@@ -1,0 +1,5 @@
+-e .[gui]
+autopep8>=2.0.4
+ipython>=8.21.0
+pylint>=3.0.3
+rich>=13.7.0

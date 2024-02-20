@@ -476,7 +476,7 @@ class Maze:
             TODO: add format explanation and links
         """
         if isinstance(maze_file, AnyPath):
-            maze_file = open(maze_file, "rt", encoding="ASCII")
+            maze_file = open(maze_file, "rt", encoding="UTF-8")
         elif isinstance(maze_file, bytearray | memoryview):
             raise TypeError(f"expected str, bytes, path-like or file-like. not {type(maze_file).__name__}")
 
