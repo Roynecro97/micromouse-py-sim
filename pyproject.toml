@@ -65,3 +65,11 @@ version = {attr = "sim.__version__"}
 [tool.setuptools.packages.find]
 exclude = ["mazes"]
 namespaces = false
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "--doctest-modules --showlocals -ra"
+testpaths = [
+  "sim",
+  "tests",
+]

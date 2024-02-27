@@ -471,7 +471,7 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
 
         print(f"sim: stepping from {(row, col)} to {direction} (while facing {facing})")
 
-        if direction_to_wall(direction) in Walls(self._maze[row, col]):
+        if direction_to_wall(direction) in self._maze[row, col]:
             print(f"sim: crashed! {direction_to_wall(direction)=!s} to {self._maze[row, col]=!s}")
             # Robot crashed into a wall
             return False
