@@ -9,6 +9,7 @@ from enum import auto, Enum
 from typing import NamedTuple, overload, TYPE_CHECKING
 
 from .maze import Direction, ExtendedMaze, Maze, RelativeDirection, Walls
+from .unionfind import UnionFind
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Generator
@@ -375,6 +376,14 @@ class Simulator:
         self._maze = ExtendedMaze.full_from_maze(maze)
         self._begin = begin
         self._end = set(end)
+
+        if direction_to_wall(self._begin[-1]) in self._maze[self._begin[:-1]]:
+            raise ValueError("robot starts facing a wall")
+        if not self._end:
+            raise ValueError("must specify at least 1 end cell")
+        if not self.connected(self._begin[:-1], self._end):
+            raise ValueError("the starting position (begin) is not connected to all goal positions (end)")
+
         self.restart(alg)
 
     def restart(self, alg: Algorithm):
@@ -521,3 +530,27 @@ class Simulator:
     def status(self) -> SimulationStatus:
         """The status of the simulator."""
         return self._status
+
+    def connected(self, a: tuple[int, int] | Iterable[tuple[int, int]], b: tuple[int, int] | Iterable[tuple[int, int]]) -> bool:
+        """Check if two cells (or cell groups) are connected in the maze."""
+        # Calculate connectivity
+        connectivity: UnionFind[tuple[int, int]] = UnionFind()
+        for row in range(self._maze.height):
+            for col in range(self._maze.width):
+                for missing in ~self._maze[row, col]:
+                    match missing:
+                        case Walls.NORTH: connectivity.union((row, col), (row - 1, col))
+                        case Walls.EAST: connectivity.union((row, col), (row, col + 1))
+                        case Walls.SOUTH: connectivity.union((row, col), (row + 1, col))
+                        case Walls.WEST: connectivity.union((row, col), (row, col - 1))
+
+        # Normalize input to 2 sets
+        def _normalize(maybe_group: tuple[int, int] | Iterable[tuple[int, int]]) -> set[tuple[int, int]]:
+            if not isinstance(maybe_group, tuple):
+                return set(maybe_group)
+            if len(maybe_group) != 2 or isinstance(maybe_group[0], tuple):
+                return set(maybe_group)  # type: ignore
+            return {maybe_group}  # type: ignore
+
+        # Check connectivity
+        return all(all(connectivity.connected(point_a, point_b) for point_b in _normalize(b)) for point_a in _normalize(a))
