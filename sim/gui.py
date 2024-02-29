@@ -1,13 +1,15 @@
 """Temp file currently running the GUI
 """
+# pylint gives too many false-positive "no member" for pygame attributes
+# pylint: disable=no-member
 
 from __future__ import annotations
+
+import math
 
 from datetime import datetime, timedelta
 from os import environ
 from typing import Iterable, NamedTuple, Self
-
-import numpy as np
 
 from .maze import Direction, ExtraCellInfo, ExtendedMaze, Maze, RelativeDirection, Walls
 from .simulator import idle_robot, random_robot, simple_flood_fill, SimulationStatus, Simulator, wall_follower_robot
@@ -51,7 +53,7 @@ class GUIRenderer:
             robot_pos: tuple[int, int] = (0, 0),
             robot_direction: Direction = Direction.NORTH,
             heatmap: bool = False,
-    ):  # pylint: disable=too-many-arguments
+    ):  # pylint: disable=too-many-arguments,too-many-locals
         """Draw the maze on screen.
 
         Args:
@@ -144,14 +146,14 @@ class GUIRenderer:
             tile_size (int): the size of a maze's single tile.
         """
         robot_radius = (tile_size * 0.8) // 2
-        robot_pos = (robot_pos[0] + tile_size // 2, robot_pos[1] + tile_size // 2)
+        robot_pos = Position(robot_pos[0] + tile_size // 2, robot_pos[1] + tile_size // 2)
         pygame.draw.circle(screen, cls.robot_main_color, robot_pos, robot_radius)
-        heading_point = (robot_pos[0] + robot_radius * np.cos(robot_direction.to_radians()),
-                         robot_pos[1] + robot_radius * np.sin(robot_direction.to_radians()))
+        heading_point = (robot_pos[0] + robot_radius * math.cos(robot_direction.to_radians()),
+                         robot_pos[1] + robot_radius * math.sin(robot_direction.to_radians()))
         pygame.draw.line(screen, cls.robot_second_color, robot_pos, heading_point, 1)
 
     @classmethod
-    def draw_text(cls, screen: pygame.surface.Surface, text: str, size: int, center: Position, color='white'):
+    def draw_text(cls, screen: pygame.surface.Surface, text: str, size: int, center: Position, color='white'):  # pylint: disable=too-many-arguments
         """Draw text on screen.
 
         Args:
@@ -162,10 +164,10 @@ class GUIRenderer:
             color (str, optional): text's color. Defaults to 'white'.
         """
         font = pygame.font.Font(pygame.font.get_default_font(), size)
-        text = font.render(text, True, color)
-        text_rect = text.get_rect()
+        render_text = font.render(text, True, color)
+        text_rect = render_text.get_rect()
         text_rect.center = center
-        screen.blit(text, text_rect)
+        screen.blit(render_text, text_rect)
 
     @classmethod
     def _scale(cls, maze_width: int, maze_height: int):
@@ -185,7 +187,7 @@ class GUIRenderer:
         return tile_size, half_tile, full_maze_offset, full_maze_center, robot_maze_offset, robot_maze_center
 
     @classmethod
-    def main_loop(cls, screen: pygame.surface.Surface, sim: Simulator):
+    def main_loop(cls, screen: pygame.surface.Surface, sim: Simulator):  # pylint: disable=too-many-locals
         """Main GUI loop. This function will stay in a loop.
 
         Args:
@@ -209,7 +211,7 @@ class GUIRenderer:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     return
-                elif event.type == pygame.VIDEORESIZE:
+                if event.type == pygame.VIDEORESIZE:
                     tile_size, half_tile, full_maze_offset, full_maze_center, robot_maze_offset, robot_maze_center = cls._scale(
                         sim.maze.width, sim.maze.height)
                 elif event.type == pygame.KEYDOWN:

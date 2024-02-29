@@ -367,7 +367,7 @@ class SimulationStatus(Enum):
     ERROR = auto()
 
 
-class Simulator:
+class Simulator:  # pylint: disable=too-many-instance-attributes
     """A micromouse simulator."""
     _status: SimulationStatus
     __robot_pos: tuple[int, int, Direction]
