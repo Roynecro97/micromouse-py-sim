@@ -1,6 +1,0 @@
-autopep8
-ipython
-numpy
-pygame
-pylint
-rich

@@ -48,6 +48,8 @@ class RelativeDirection(Enum):
     def invert(self: Literal[LEFT]) -> Literal[RIGHT]: ...
     @overload
     def invert(self: Literal[RIGHT]) -> Literal[LEFT]: ...
+    @overload
+    def invert(self) -> RelativeDirection: ...
 
     def invert(self) -> RelativeDirection:
         """Invert the direction (left <-> right; front <-> back)"""
@@ -160,15 +162,6 @@ class Direction(IntEnum):
     def to_radians(self) -> float:
         """Get the rotation radians. EAST is 0, angles increase clockwise."""
         return math.radians(self.to_degrees())
-
-    def __or__(self, other: Self | int) -> Self:
-        return type(self)(super().__or__(other))
-
-    def __and__(self, other: Self | int) -> Self:
-        return type(self)(super().__and__(other))
-
-    def __xor__(self, other: Self | int) -> Self:
-        return type(self)(super().__xor__(other))
 
     def __str__(self):
         return self.name
@@ -476,7 +469,7 @@ class Maze:
             TODO: add format explanation and links
         """
         if isinstance(maze_file, AnyPath):
-            maze_file = open(maze_file, "rt", encoding="ASCII")
+            maze_file = open(maze_file, "rt", encoding="UTF-8")
         elif isinstance(maze_file, bytearray | memoryview):
             raise TypeError(f"expected str, bytes, path-like or file-like. not {type(maze_file).__name__}")
 
@@ -662,14 +655,10 @@ class Maze:
         if not isinstance(idx, tuple) or len(idx) != 2 or not all(isinstance(i, int) for i in idx):
             raise TypeError(f"expected 2 ints: (row, col), got {idx!r}")
         row, col = idx
-        # TODO: make this prettier
-        if row >= self.height:
-            raise IndexError("TODO: pretty string")
-        if col >= self.width:
-            raise IndexError("TODO: pretty string")
         val = self.get(row, col, _Missing())
-        assert not isinstance(val, _Missing)
-        return val
+        if isinstance(val, _Missing):
+            raise IndexError("TODO: pretty string")
+        return Walls(val)
 
     def __setitem__(self, idx: tuple[int, int], value: Walls):
         if not isinstance(idx, tuple) or len(idx) != 2 or not all(isinstance(i, int) for i in idx):
