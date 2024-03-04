@@ -12,7 +12,8 @@ from os import environ
 from typing import Iterable, NamedTuple, Self
 
 from .maze import Direction, ExtraCellInfo, ExtendedMaze, Maze, RelativeDirection, Walls
-from .simulator import idle_robot, random_robot, simple_flood_fill, SimulationStatus, Simulator, wall_follower_robot
+from .robots import idle_robot, random_robot, simple_flood_fill, wall_follower_robot
+from .simulator import SimulationStatus, Simulator
 
 # Disable the prompt triggered by importing `pygame`.
 # autopep8: off
@@ -245,6 +246,20 @@ class GUIRenderer:
             cls.draw_maze(screen, sim.robot_maze, tile_size, robot_maze_offset, sim.end, (robot_x, robot_y), robot_heading)
             pygame.display.update()
 
+    @classmethod
+    def run(cls, sim: Simulator):
+        """Run the simulation GUI. This is the main entrypoint for the GUI.
+
+        Args:
+            sim (Simulator): the micromouse simulator to draw.
+        """
+        pygame.init()
+        screen = pygame.display.set_mode((1280, 720), pygame.RESIZABLE)
+        pygame.display.set_caption('Maze test')
+
+        cls.main_loop(screen, sim)
+        pygame.quit()
+
 
 def _main():
     sim = Simulator(
@@ -254,13 +269,7 @@ def _main():
         end={(1, 2)},
     )
 
-    pygame.init()
-    screen_size = (1280, 720)
-    screen = pygame.display.set_mode(screen_size)
-    pygame.display.set_caption('Maze test')
-
-    GUIRenderer.main_loop(screen, sim)
-    pygame.quit()
+    GUIRenderer.run(sim)
 
 if __name__ == '__main__':
     _main()

@@ -163,6 +163,28 @@ class Direction(IntEnum):
         """Get the rotation radians. EAST is 0, angles increase clockwise."""
         return math.radians(self.to_degrees())
 
+    @staticmethod
+    def from_str(direction: str) -> Direction:  # pylint: disable=too-many-return-statements
+        """Create from a direction name."""
+        match direction.strip().casefold():
+            case 'north' | 'n':
+                return Direction.NORTH
+            case 'east' | 'e':
+                return Direction.EAST
+            case 'south' | 's':
+                return Direction.SOUTH
+            case 'west' | 'w':
+                return Direction.WEST
+            case 'north_east' | 'north east' | 'ne':
+                return Direction.NORTH_EAST
+            case 'north_west' | 'north west' | 'nw':
+                return Direction.NORTH_WEST
+            case 'south_east' | 'south east' | 'se':
+                return Direction.SOUTH_EAST
+            case 'south_west' | 'south west' | 'sw':
+                return Direction.SOUTH_WEST
+        raise ValueError(f"{direction!r} is not a valid Direction")
+
     def __str__(self):
         return self.name
 

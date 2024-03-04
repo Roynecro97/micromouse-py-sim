@@ -46,6 +46,9 @@ dependencies = [
   "numpy>=1.26.4",
 ]
 
+[project.scripts]
+micromouse = "sim.__main__:main"
+
 [project.gui-scripts]
 sim = "sim.gui:_main [gui]"
 

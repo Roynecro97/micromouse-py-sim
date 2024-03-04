@@ -87,3 +87,36 @@ def test_direction_half_turn_back(direction: Direction):
 def test_direction_degrees(direction: Direction, degrees: int):
     assert direction.to_degrees() == degrees
     assert direction.to_radians() == math.radians(degrees)
+
+
+@pytest.mark.parametrize("direction", Direction)
+def test_direction_from_str(direction: Direction):
+    assert Direction.from_str(direction.name) == direction
+    assert Direction.from_str(direction.name.lower()) == direction
+    assert Direction.from_str(direction.name.upper()) == direction
+    spaced_name = direction.name.replace('_', ' ')
+    assert Direction.from_str(spaced_name.lower()) == direction
+    assert Direction.from_str(spaced_name.upper()) == direction
+    abbrev = ''.join(part[0] for part in direction.name.split('_'))
+    assert Direction.from_str(abbrev.lower()) == direction
+    assert Direction.from_str(abbrev.upper()) == direction
+
+
+@pytest.mark.parametrize("direction", [
+    # Completely wrong
+    '',
+    'x',
+    'q',
+    # Opposing directions
+    'north south', 'ns',
+    'south_north', 'sn',
+    'east west', 'ew',
+    'west_east', 'we',
+    'nws', 'nwe',
+    # Wrong order
+    'wn',
+    'east south',
+])
+def test_direction_from_bad_str(direction: str):
+    with pytest.raises(ValueError):
+        Direction.from_str(direction)
