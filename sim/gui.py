@@ -12,7 +12,8 @@ from os import environ
 from typing import Iterable, NamedTuple, Self
 
 from .maze import Direction, ExtraCellInfo, ExtendedMaze, Maze, RelativeDirection, Walls
-from .simulator import idle_robot, random_robot, simple_flood_fill, SimulationStatus, Simulator, wall_follower_robot
+from .robots import idle_robot, random_robot, simple_flood_fill, wall_follower_robot
+from .simulator import SimulationStatus, Simulator
 
 # Disable the prompt triggered by importing `pygame`.
 # autopep8: off
