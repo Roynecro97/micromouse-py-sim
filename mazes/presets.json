@@ -1,0 +1,20 @@
+{
+    "simple": {
+        "file": "mazes/simple.maze",
+        "start_pos": [0, 0],
+        "start_direction": "south",
+        "goals": [[1, 2]]
+    },
+    "floating": {
+        "file": "mazes/floating.maze",
+        "start_pos": [0, 0],
+        "start_direction": "south",
+        "goals": [[1, 2]]
+    },
+    "floating2": {
+        "file": "mazes/floating2.maze",
+        "start_pos": [0, 0],
+        "start_direction": "south",
+        "goals": [[1, 2]]
+    }
+}

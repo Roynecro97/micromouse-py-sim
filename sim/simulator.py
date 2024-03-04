@@ -37,7 +37,7 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
         self._begin = begin
         self._end = set(end)
 
-        if direction_to_wall(self._begin[-1]) in self._maze[self._begin[:-1]]:
+        if self._begin[:-1] not in self._end and direction_to_wall(self._begin[-1]) in self._maze[self._begin[:-1]]:
             raise ValueError("robot starts facing a wall")
         if not self._end:
             raise ValueError("must specify at least 1 end cell")
