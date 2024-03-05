@@ -35,7 +35,15 @@ def _simple_flood_fill(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot
             current = adjacent_cells(maze, current, seen)
             if len(seen) >= maze.cell_size:
                 break
-        assert len(seen) == maze.cell_size, "new cells created"
+            print("subset:", current.issubset(seen))
+            if current.issubset(seen):
+                unreachable = {(r, c) for r in range(maze.height) for c in range(maze.width)} - seen
+                print("unreachable:", unreachable)
+                for cell in unreachable:
+                    maze.extra_info[cell].weight = float('inf')
+                seen.update(unreachable)
+                break  # unreachable cells detected
+        assert len(seen) == maze.cell_size, f"new cells created ({len(seen)}/{maze.cell_size})"
 
     def _visual_flood():  # TODO: delete once we have stat representation on our GUI
         import numpy as np  # pylint: disable=import-outside-toplevel
