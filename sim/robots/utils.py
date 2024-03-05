@@ -146,6 +146,34 @@ def adjacent_cells(maze: Maze, cells: Iterable[tuple[int, int]], without: set[tu
     return set(_adjacent_cells_impl(maze, cells)) - (without or set())
 
 
+def direction_to_cell(cell: tuple[int, int], direction: Direction) -> tuple[int, int]:
+    """
+    Returns the indexes of the cell to the ``direction`` of the given cell.
+
+    Args:
+        cell (tuple[int, int]): The current cell.
+        direction (Direction): The direction to move at. Must be a primary direction.
+
+    Raises:
+        ValueError: ``direction`` is a secondary direction.
+
+    Returns:
+        tuple[int, int]: The required cell, may be out of bounds of the maze.
+    """
+    row, col = cell
+    match direction:
+        case Direction.NORTH:
+            return (row - 1, col)
+        case Direction.EAST:
+            return (row, col + 1)
+        case Direction.SOUTH:
+            return (row + 1, col)
+        case Direction.WEST:
+            return (row, col - 1)
+    raise ValueError(f"unsupported direction {direction}")
+
+
+
 def identity[T](obj: T) -> T:
     """Return ``obj``.
 
