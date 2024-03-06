@@ -287,12 +287,12 @@ def main():
         print("no maze")
         sys.exit(1)
 
-    GUIRenderer.run(Simulator(
+    GUIRenderer(Simulator(
         alg=idle_robot,
         maze=args.maze,
         begin=args.start_pos + (args.start_direction,),
         end=args.goals,
-    ))
+    )).run()
 
 
 if __name__ == '__main__':
