@@ -55,6 +55,7 @@ sim = "sim.gui:_main [gui]"
 [project.optional-dependencies]
 gui = [
   "pygame>=2.5.2",
+  "pygame_gui>=0.6.9"
 ]
 
 [project.urls]
