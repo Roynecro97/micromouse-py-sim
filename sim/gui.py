@@ -23,12 +23,12 @@ import pygame_gui    # pylint: disable=wrong-import-order,wrong-import-position
 # autopep8: on
 
 
-robots = {
-    "Idle": idle_robot,
-    "Random": random_robot,
-    "Left Wall Follower": wall_follower_robot(RelativeDirection.LEFT),
-    "Right Wall Follower": wall_follower_robot(RelativeDirection.RIGHT),
-    "Flood Fill": simple_flood_fill,
+ROBOTS = {
+    'Idle': idle_robot,
+    'Random': random_robot,
+    'Left Wall Follower': wall_follower_robot(RelativeDirection.LEFT),
+    'Right Wall Follower': wall_follower_robot(RelativeDirection.RIGHT),
+    'Flood Fill': simple_flood_fill,
 }
 
 
@@ -57,25 +57,25 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
         screen = pg.display.set_mode(initial_screen_size, pg.RESIZABLE)
         pg.display.set_caption('Micromouse')
         self.screen = screen
-        self.wall_thickness: int = 5
-        self.wall_color: str = 'red'
-        self.robot_main_color: str = 'blue'
-        self.robot_second_color: str = 'yellow'
-        self.goal_color: str = 'green'
-        self.heatmap_colors: list = ['blue', 'cyan', 'green', 'yellow', 'orange', 'red', 'brown']
+        self.wall_thickness = 5
+        self.wall_color = 'red'
+        self.robot_main_color = 'blue'
+        self.robot_second_color = 'yellow'
+        self.goal_color = 'green'
+        self.heatmap_colors = ['blue', 'cyan', 'green', 'yellow', 'orange', 'red', 'brown']
         self.ui_manager = pygame_gui.UIManager((screen.get_width(), screen.get_height()))
         self.start_button = pygame_gui.elements.UIButton(relative_rect=pg.Rect((0, 0), (0, 0)), text='Start', manager=self.ui_manager)
         self.start_button.tool_tip_text = "Shortcut: 's'"
         self.step_button = pygame_gui.elements.UIButton(relative_rect=pg.Rect((0, 0), (0, 0)), text='Step', manager=self.ui_manager)
         self.step_button.tool_tip_text = "Shortcut: 'n'"
-        self.robot_dropdown = pygame_gui.elements.UIDropDownMenu(
-            list(robots.keys()), list(robots.keys())[0], pg.Rect((0, 0), (0, 0)), self.ui_manager)
+        self.robot_dropdown = pygame_gui.elements.UIDropDownMenu(list(ROBOTS), 'Idle', pg.Rect((0, 0), (0, 0)), self.ui_manager)
 
         self.sim_auto_step = False
         self.sim = sim
 
-        screen_width, screen_height = initial_screen_size
-        self.tile_size = min(screen_width // (2 * self.sim.maze.width + 3), screen_height // (self.sim.maze.height + 4))
+        self.screen_width, self.screen_height = initial_screen_size
+        self.text_size = 4 * min(self.screen_width, self.screen_height) // 100
+        self.tile_size = min(self.screen_width // (2 * self.sim.maze.width + 3), self.screen_height // (self.sim.maze.height + 4))
         self.half_tile = self.tile_size // 2
         self.full_maze_offset = Position(self.tile_size, 3 * self.tile_size)
         self.full_maze_center = self.full_maze_offset + Position(self.sim.maze.width * self.half_tile, 0)
@@ -96,7 +96,7 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
         Returns:
             Robot: The chosen robot
         """
-        return robots[self.robot_dropdown.selected_option]
+        return ROBOTS[self.robot_dropdown.selected_option]
 
     def get_selected_maze(self):
         """Fetch the selected preset for maze.
@@ -277,20 +277,20 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
 
     def scale(self):
         """Calculate sizes and offsets of GUI elements according to screen size."""
-        screen_width, screen_height = pg.display.get_surface().get_size()
-        self.ui_manager.set_window_resolution((screen_width, screen_height))
-        self.tile_size = min(screen_width // (2 * self.sim.maze.width + 20), screen_height // (self.sim.maze.height + 5))
+        self.screen_width, self.screen_height = pg.display.get_surface().get_size()
+        self.ui_manager.set_window_resolution((self.screen_width, self.screen_height))
+        self.text_size = 4 * min(self.screen_width, self.screen_height) // 100
+        self.tile_size = min(self.screen_width // (2 * self.sim.maze.width + 3), self.screen_height // (self.sim.maze.height + 5))
         self.half_tile = self.tile_size // 2
         self.full_maze_offset = Position(self.tile_size, 4 * self.tile_size)
         self.full_maze_center = self.full_maze_offset + Position(self.sim.maze.width * self.half_tile, 0)
         self.robot_maze_offset = self.full_maze_offset + Position((self.sim.maze.width + 1) * self.tile_size, 0)
         self.robot_maze_center = self.robot_maze_offset + Position(self.sim.maze.width * self.half_tile, 0)
-        mazes_center_x = (self.full_maze_center.row + self.robot_maze_center.row) // 2
-        self.start_button.set_position((mazes_center_x - 4 * self.tile_size, 2 * self.tile_size))
+        self.start_button.set_position((self.screen_width // 2 - 2 * self.tile_size, 2 * self.tile_size))
         self.start_button.set_dimensions((3 * self.tile_size, self.tile_size))
-        self.step_button.set_position((mazes_center_x + self.tile_size, 2 * self.tile_size))
+        self.step_button.set_position((self.screen_width // 2 + 2 * self.tile_size, 2 * self.tile_size))
         self.step_button.set_dimensions((3 * self.tile_size, self.tile_size))
-        self.robot_dropdown.set_position((12 * self.tile_size, 0))
+        self.robot_dropdown.set_position((self.screen_width // 2, 0))
         self.robot_dropdown.set_dimensions((5 * self.tile_size, self.tile_size))
 
     def main_loop(self):  # pylint: disable=too-many-locals
@@ -336,15 +336,15 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
                 print(f"GUI: after step - {self.sim.maze[self.sim.robot_pos[:-1]]=} {self.sim.robot_maze[self.sim.robot_pos[:-1]]=}")
 
             self.screen.fill("black")
-            self.draw_text('Full Maze', self.half_tile, self.full_maze_center + Position(0, -self.half_tile))
-            self.draw_text('Robot View', self.half_tile, self.robot_maze_center + Position(0, -self.half_tile))
+            self.draw_text('Full Maze', self.text_size, self.full_maze_center + Position(0, -self.half_tile))
+            self.draw_text('Robot View', self.text_size, self.robot_maze_center + Position(0, -self.half_tile))
             robot_y, robot_x, robot_heading = self.sim.robot_pos
             self.draw_maze(self.sim.maze, self.tile_size, self.full_maze_offset,
                            self.sim.end, (robot_x, robot_y), robot_heading, heatmap=True)
             self.draw_maze(self.sim.robot_maze, self.tile_size, self.robot_maze_offset, self.sim.end, (robot_x, robot_y), robot_heading)
 
             # texts for menus:
-            self.draw_text('Algorithm:', self.tile_size // 2, Position(10 * self.tile_size, self.half_tile))
+            self.draw_text('Algorithm:', self.text_size, Position(self.screen_width // 2 - 110, self.half_tile))
 
             self.update(time_delta)
 
