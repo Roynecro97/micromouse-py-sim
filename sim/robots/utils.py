@@ -173,6 +173,77 @@ def direction_to_cell(cell: tuple[int, int], direction: Direction) -> tuple[int,
     raise ValueError(f"unsupported direction {direction}")
 
 
+def cell_to_direction(  # pylint: disable=too-many-return-statements
+        src_cell: tuple[int, int],
+        dst_cell: tuple[int, int],
+        diagonals: bool = False,
+) -> Direction:
+    """
+    Returns the direction to move at to get from ``src_cell`` to the adjacent ``dst_cell``.
+
+    Args:
+        src_cell (tuple[int, int]): The source cell.
+        dst_cell (tuple[int, int]): The destination cell.
+        diagonals (bool, optional): Whether diagonals are allowed. Defaults to False.
+
+    Raises:
+        ValueError: If ``dst_cell`` is not adjacent to ``src_cell``.
+
+    Returns:
+        Direction: The direction that will return ``dst_cell`` from a call to direction_to_cell.
+
+    >>> cell = (4, 5)
+    >>> direction = cell_to_direction(cell, (4, 6))
+    >>> direction_to_cell(cell, direction)
+    (4, 6)
+    """
+    src_row, src_col = src_cell
+    dst_row, dst_col = dst_cell
+    match (dst_row - src_row, dst_col - src_col):
+        case (-1, 0):
+            return Direction.NORTH
+        case (0, 1):
+            return Direction.EAST
+        case (1, 0):
+            return Direction.SOUTH
+        case (0, -1):
+            return Direction.WEST
+        case (-1, 1) if diagonals:
+            return Direction.NORTH_EAST
+        case (1, 1) if diagonals:
+            return Direction.SOUTH_EAST
+        case (1, -1) if diagonals:
+            return Direction.SOUTH_WEST
+        case (-1, -1) if diagonals:
+            return Direction.NORTH_WEST
+    raise ValueError(f"{dst_cell} is not adjacent to {src_cell} ({diagonals=})")
+
+
+def abs_turn_to_actions(before: Direction, after: Direction, allow_reverse: bool = True) -> list[Action]:
+    """Actions required to get from a cell, facing ``before`` to the cell at the ``after`` direction."""
+    if before == after:
+        return [Action.FORWARD]
+    if before.turn_back() == after:
+        return [Action.BACKWARDS] if allow_reverse else [Action.TURN_LEFT, Action.TURN_LEFT, Action.FORWARD]
+    if before.turn_left() == after:
+        return [Action.TURN_LEFT, Action.FORWARD]
+    if before.turn_right() == after:
+        return [Action.TURN_RIGHT, Action.FORWARD]
+    raise ValueError(f"Turn not supported: {before} -> {after}")
+
+
+def abs_turn_to_rel(before: Direction, after: Direction) -> RelativeDirection:
+    """Relative direction to get from a facing ``before`` to facing ``after`` direction."""
+    if before == after:
+        return RelativeDirection.FRONT
+    if before.turn_back() == after:
+        return RelativeDirection.BACK
+    if before.turn_left() == after:
+        return RelativeDirection.LEFT
+    if before.turn_right() == after:
+        return RelativeDirection.RIGHT
+    raise ValueError(f"Turn not supported: {before} -> {after}")
+
 
 def identity[T](obj: T) -> T:
     """Return ``obj``.
