@@ -9,9 +9,9 @@ from contextlib import contextmanager
 from enum import auto, Enum
 from typing import TYPE_CHECKING
 
-from .maze import Direction, ExtendedMaze, Maze, Walls
+from .maze import Direction, ExtendedMaze, Maze, RelativeDirection, Walls
 from .robots import Action, RobotState
-from .robots.utils import direction_to_wall
+from .robots.utils import build_weighted_graph, dijkstra, direction_to_wall
 from .unionfind import UnionFind
 
 if TYPE_CHECKING:
@@ -65,6 +65,22 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
             raise ValueError("must specify at least 1 end cell")
         if not self.connected(self._begin[:-1], self._end):
             raise ValueError("the starting position (begin) is not connected to all goal positions (end)")
+
+        self._maze.route = min(
+            dijkstra(
+                build_weighted_graph(
+                    self._maze,
+                    {
+                        RelativeDirection.FRONT: 1,
+                        RelativeDirection.BACK: 2,
+                        RelativeDirection.LEFT: 4,
+                        RelativeDirection.RIGHT: 4,
+                    },
+                ),
+                self._begin,
+                goals=self._end,
+            ).values(),
+        )[1]
 
         self.restart(alg)
 
