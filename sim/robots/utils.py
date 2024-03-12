@@ -5,6 +5,7 @@ Utility functions for all robots.
 
 from __future__ import annotations
 
+import heapq
 import os
 import random
 
@@ -246,6 +247,7 @@ def abs_turn_to_rel(before: Direction, after: Direction) -> RelativeDirection:
 
 
 type Vertex = tuple[int, int, Direction]
+type WeightedGraph = dict[Vertex, dict[Vertex, float]]
 
 
 def _callable_weights(
@@ -260,13 +262,13 @@ def _callable_weights(
 
 
 def build_weighted_graph(
-        maze: ExtendedMaze,
+        maze: Maze,
         weights: dict[RelativeDirection, float] | Callable[[RelativeDirection], float],
         *,
         order: int = 1,
         diagonals: bool = False,
         without: Set[tuple[int, int]] = frozenset(),
-) -> dict[Vertex, dict[Vertex, float]]:
+) -> WeightedGraph:
     """Build a graph from"""
     if order <= 0:
         raise ValueError(f"order must be positive: {order}")
@@ -301,6 +303,111 @@ def build_weighted_graph(
                 graph[v1][v2] = weights(abs_turn_to_rel(d1.turn_back(), d2))
 
     return graph
+
+
+DIJKSTRA_UNREACHABLE: tuple[float, list[Vertex]] = (float('inf'), [])
+
+
+def _reduce_dijkstra_route(weight_route: tuple[float, list[Vertex]], /) -> tuple[float, list[tuple[int, int]]]:
+    reduced_route = []
+    for v in weight_route[1]:
+        cell = v[:-1]
+        if cell not in reduced_route[-1:]:
+            reduced_route.append(cell)
+    return weight_route[0], reduced_route
+
+
+def dijkstra(
+        graph: WeightedGraph,
+        src: Vertex,
+        *,
+        goals: Set[tuple[int, int]] | tuple[int, int] | None = None,
+) -> dict[tuple[int, int], tuple[float, list[tuple[int, int]]]]:
+    """Calculate shortest paths from ``src`` using Dijkstra.
+
+    Args:
+        graph (WeightedGraph): The graph to work with.
+        src (Vertex): The vertex to calculate paths from: (row, col, heading).
+        goals (Set[tuple[int, int]] | tuple[int, int] | None, optional):
+            If not None, only return paths to the specified cells. Defaults to None.
+
+    Returns:
+        dict[tuple[int, int], tuple[float, list[tuple[int, int]]]]:
+            Mapping of {cell: (weight, shortest_path) for cell in graph}.
+            Note that a cell is a (row, col) tuple, meaning a the graph {(0, 0, N): {...}, (0, 0, E): {...}}
+            only has the single cell (0, 0) in it.
+    """
+    ds: dict[Vertex, tuple[float, list[Vertex]]] = {src: (0, [src])}
+
+    def _distance(v: Vertex, /) -> float:
+        return ds.get(v, DIJKSTRA_UNREACHABLE)[0]
+
+    class CompareByDistance:
+        """For heapq"""
+
+        def __init__(self, v: Vertex):
+            self.v = v
+
+        def __eq__(self, other: CompareByDistance | Vertex) -> bool:
+            if isinstance(other, CompareByDistance):
+                other = other.v
+            return _distance(self.v) == _distance(other)
+
+        def __lt__(self, other: CompareByDistance | Vertex) -> bool:
+            if isinstance(other, CompareByDistance):
+                other = other.v
+            return _distance(self.v) < _distance(other)
+
+        def __gt__(self, other: CompareByDistance | Vertex) -> bool:
+            if isinstance(other, CompareByDistance):
+                other = other.v
+            return _distance(self.v) > _distance(other)
+
+        def __le__(self, other: CompareByDistance | Vertex) -> bool:
+            if isinstance(other, CompareByDistance):
+                other = other.v
+            return _distance(self.v) <= _distance(other)
+
+        def __ge__(self, other: CompareByDistance | Vertex) -> bool:
+            if isinstance(other, CompareByDistance):
+                other = other.v
+            return _distance(self.v) >= _distance(other)
+
+        def __str__(self):
+            return str(self.v)
+
+        def __repr__(self):
+            return repr(self.v)
+
+    q = [CompareByDistance(v) for v in graph]
+
+    while q:
+        heapq.heapify(q)
+        u = heapq.heappop(q).v
+
+        dsu = _distance(u)
+        for v in graph[u]:
+            new_dist = dsu + graph[u][v]
+            if new_dist < _distance(v):
+                ds[v] = new_dist, ds[u][1] + [v]
+
+    if goals is None:
+        goals = frozenset(v[:-1] for v in ds)
+    if isinstance(goals, tuple):
+        goals = frozenset([goals])
+
+    return {
+        goal: _reduce_dijkstra_route(min(
+            (
+                ds.get(v, DIJKSTRA_UNREACHABLE)
+                for direction in Direction
+                if (v := goal + (direction,)) in ds
+            ),
+            default=DIJKSTRA_UNREACHABLE,
+            key=lambda weight_route: weight_route[0],
+        ))
+        for goal in goals
+    }
 
 
 def identity[T](obj: T) -> T:

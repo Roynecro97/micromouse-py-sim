@@ -6,14 +6,13 @@ then uses an "optimal" route (by default, also using flood-fill).
 
 from __future__ import annotations
 
-import heapq
 import math
 
 from functools import partial
 from typing import Protocol, TypedDict, TYPE_CHECKING
 
 from .utils import Action, adjacent_cells, direction_to_cell, shuffled, walls_to_directions
-from .utils import build_weighted_graph, identity, Vertex
+from .utils import build_weighted_graph, dijkstra, identity
 from .const import predetermined_path_robot
 from ..maze import Direction, RelativeDirection
 
@@ -338,99 +337,6 @@ def simple_flood_fill(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot:
     return flood_fill_robot(final_unknown_penalty=0)(maze, goals)
 
 
-DIJKSTRA_UNREACHABLE: tuple[float, list[Vertex]] = (math.inf, [])
-
-
-def _reduce_dijkstra_route(weight_route: tuple[float, list[Vertex]], /) -> tuple[float, list[tuple[int, int]]]:
-    reduced_route = []
-    for v in weight_route[1]:
-        cell = v[:-1]
-        if cell not in reduced_route[-1:]:
-            reduced_route.append(cell)
-    return weight_route[0], reduced_route
-
-
-def _dijkstra(  # pylint: disable=too-many-arguments
-        maze: ExtendedMaze,
-        src: Vertex,
-        weights: dict[RelativeDirection, float] | Callable[[RelativeDirection], float],
-        goals: Set[tuple[int, int]] | tuple[int, int] | None = None,
-        without: Set[tuple[int, int]] = frozenset(),
-) -> dict[tuple[int, int], tuple[float, list[tuple[int, int]]]]:
-    graph = build_weighted_graph(maze, weights, without=without)
-    ds: dict[Vertex, tuple[float, list[Vertex]]] = {src: (0, [src])}
-
-    def _distance(v: Vertex, /) -> float:
-        return ds.get(v, DIJKSTRA_UNREACHABLE)[0]
-
-    class CompareByDistance:
-        """For heapq"""
-
-        def __init__(self, v: Vertex):
-            self.v = v
-
-        def __eq__(self, other: CompareByDistance | Vertex) -> bool:
-            if isinstance(other, CompareByDistance):
-                other = other.v
-            return _distance(self.v) == _distance(other)
-
-        def __lt__(self, other: CompareByDistance | Vertex) -> bool:
-            if isinstance(other, CompareByDistance):
-                other = other.v
-            return _distance(self.v) < _distance(other)
-
-        def __gt__(self, other: CompareByDistance | Vertex) -> bool:
-            if isinstance(other, CompareByDistance):
-                other = other.v
-            return _distance(self.v) > _distance(other)
-
-        def __le__(self, other: CompareByDistance | Vertex) -> bool:
-            if isinstance(other, CompareByDistance):
-                other = other.v
-            return _distance(self.v) <= _distance(other)
-
-        def __ge__(self, other: CompareByDistance | Vertex) -> bool:
-            if isinstance(other, CompareByDistance):
-                other = other.v
-            return _distance(self.v) >= _distance(other)
-
-        def __str__(self):
-            return str(self.v)
-
-        def __repr__(self):
-            return repr(self.v)
-
-    q = [CompareByDistance(v) for v in graph]
-
-    while q:
-        heapq.heapify(q)
-        u = heapq.heappop(q).v
-
-        dsu = _distance(u)
-        for v in graph[u]:
-            new_dist = dsu + graph[u][v]
-            if new_dist < _distance(v):
-                ds[v] = new_dist, ds[u][1] + [v]
-
-    if goals is None:
-        goals = frozenset(v[:-1] for v in ds)
-    if isinstance(goals, tuple):
-        goals = frozenset([goals])
-
-    return {
-        goal: _reduce_dijkstra_route(min(
-            (
-                ds.get(v, DIJKSTRA_UNREACHABLE)
-                for direction in Direction
-                if (v := goal + (direction,)) in ds
-            ),
-            default=DIJKSTRA_UNREACHABLE,
-            key=lambda weight_route: weight_route[0],
-        ))
-        for goal in goals
-    }
-
-
 def dijkstra_solver(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot:
     """A robot that solves the maze using dijkstra.
 
@@ -455,28 +361,30 @@ def dijkstra_solver(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot:
     del maze.route
     pos_row, pos_col, facing = yield Action.RESET
 
-    shortest_routes = _dijkstra(
-        maze,
+    shortest_routes = dijkstra(
+        build_weighted_graph(
+            maze,
+            {
+                RelativeDirection.FRONT: forward_weight,
+                RelativeDirection.BACK: reverse_weight,
+                RelativeDirection.LEFT: turn_weight,
+                RelativeDirection.RIGHT: turn_weight,
+            },
+            without=unknown_cells,
+        ),
         (pos_row, pos_col, facing),
-        {
-            RelativeDirection.FRONT: forward_weight,
-            RelativeDirection.BACK: reverse_weight,
-            RelativeDirection.LEFT: turn_weight,
-            RelativeDirection.RIGHT: turn_weight,
-        },
-        without=unknown_cells,
     )
 
     for row, col, info in maze.iter_info():
-        info.weight = shortest_routes.get((row, col), (UNREACHABLE_WEIGHT, None))[0]
+        info.weight = shortest_routes.get((row, col), (math.inf, None))[0]
         info.color = 'red' if (row, col) in unknown_cells else None
 
     weight, best = min(  # there is at least 1 route
-        (shortest_routes.get(goal, (UNREACHABLE_WEIGHT, [])) for goal in goals),
+        (shortest_routes.get(goal, (math.inf, [])) for goal in goals),
         key=lambda weight_route: (weight_route[0], len(weight_route[1])),
     )
 
-    assert weight < UNREACHABLE_WEIGHT
+    assert math.isfinite(weight)
     assert best[0] == (pos_row, pos_col)
     assert best[-1] in goals
 
