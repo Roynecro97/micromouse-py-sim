@@ -2,6 +2,10 @@
 """
 from __future__ import annotations
 
+import sys
+import time
+
+from contextlib import contextmanager
 from enum import auto, Enum
 from typing import TYPE_CHECKING
 
@@ -25,6 +29,24 @@ class SimulationStatus(Enum):
     IN_PROGRESS_FOUND_DEST = auto()
     FINISHED = auto()
     ERROR = auto()
+
+
+@contextmanager
+def timed(title: str = ""):
+    """A contextmanager for measuring time (in seconds)."""
+    t0 = time.perf_counter()
+    try:
+        yield
+    finally:
+        t1 = time.perf_counter()
+        elapsed = t1 - t0
+        if exc := sys.exception():
+            result = 'failed'
+            tail = f" ({type(exc).__name__}: {exc!s})"
+        else:
+            result = 'completed'
+            tail = ""
+        print(f"{title}{title and ' '}{result} in {elapsed:0.6f}s{tail}")
 
 
 class Simulator:  # pylint: disable=too-many-instance-attributes
@@ -58,7 +80,8 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
 
         self._status = SimulationStatus.ERROR
         try:
-            state = next(self._robot)
+            with timed("sim: robot init"):
+                state = next(self._robot)
         except StopIteration as stop:
             raise RuntimeError("robot failed to start - stopped before yielding any action") from stop
         except Exception as err:
@@ -87,7 +110,8 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
         print(f"sim: robot is at {(row, col)} facing {facing}")
 
         try:
-            action = self._robot.send(RobotState(*self._robot_pos))
+            with timed("sim: robot step"):
+                action = self._robot.send(RobotState(*self._robot_pos))
         except StopIteration:
             self._status = SimulationStatus.FINISHED if (row, col) in self._end else SimulationStatus.ERROR
             print(f"sim: robot stopped, status is {self.status}")
