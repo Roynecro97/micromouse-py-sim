@@ -12,7 +12,7 @@ from os import environ
 from typing import Iterable, NamedTuple, Self
 
 from .maze import Direction, ExtraCellInfo, ExtendedMaze, Maze, RelativeDirection, Walls
-from .robots import basic_weighted_flood_fill, idle_robot, random_robot, simple_flood_fill, wall_follower_robot
+from .robots import basic_weighted_flood_fill, idle_robot, random_robot, simple_flood_fill, thourough_flood_fill, wall_follower_robot
 from .simulator import SimulationStatus, Simulator
 
 # Disable the prompt triggered by importing `pygame`.
@@ -30,6 +30,7 @@ ROBOTS = {
     'Right Wall Follower': wall_follower_robot(RelativeDirection.RIGHT),
     'Flood Fill': simple_flood_fill,
     'Flood Fill -> Dijkstra': basic_weighted_flood_fill,
+    'Thourough Flood Fill': thourough_flood_fill,
 }
 
 
@@ -193,28 +194,24 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
                 self.sim_auto_step = False
                 self.sim.restart(self.get_selected_robot())
         elif event.type == pg.KEYDOWN:
-            if event.key in (pg.K_f, pg.K_l, pg.K_n, pg.K_r, pg.K_s):
-                match (event.key, event.mod & pg.KMOD_SHIFT != 0):
-                    case (pg.K_f, True):
-                        self.sim_auto_step = True
-                        self.sim.restart(simple_flood_fill)
-                    case (pg.K_f, _):
-                        self.sim_auto_step = True
-                        self.sim.restart(basic_weighted_flood_fill)
-                    case (pg.K_l, _):
-                        self.sim_auto_step = True
-                        self.sim.restart(wall_follower_robot(RelativeDirection.LEFT))
-                    case (pg.K_n, _):
-                        self.sim_auto_step = False
-                        self.sim.step()
-                    case (pg.K_r, True):
-                        self.sim_auto_step = True
-                        self.sim.restart(random_robot)
-                    case (pg.K_r, _):
-                        self.sim_auto_step = True
-                        self.sim.restart(wall_follower_robot(RelativeDirection.RIGHT))
-                    case (pg.K_s, _):
-                        self.sim_auto_step = not self.sim_auto_step
+            match (event.key, event.mod & pg.KMOD_SHIFT != 0):
+                case (pg.K_d, _):
+                    self.sim.restart(thourough_flood_fill)
+                case (pg.K_f, True):
+                    self.sim.restart(simple_flood_fill)
+                case (pg.K_f, _):
+                    self.sim.restart(basic_weighted_flood_fill)
+                case (pg.K_l, _):
+                    self.sim.restart(wall_follower_robot(RelativeDirection.LEFT))
+                case (pg.K_n, _):
+                    self.sim_auto_step = False
+                    self.sim.step()
+                case (pg.K_r, True):
+                    self.sim.restart(random_robot)
+                case (pg.K_r, _):
+                    self.sim.restart(wall_follower_robot(RelativeDirection.RIGHT))
+                case (pg.K_s, _):
+                    self.sim_auto_step = not self.sim_auto_step
 
     def update(self, time_delta: float):
         """Update GUI elements and draw them on screen.

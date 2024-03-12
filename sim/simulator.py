@@ -9,10 +9,9 @@ from contextlib import contextmanager
 from enum import auto, Enum
 from typing import TYPE_CHECKING
 
-from .maze import Direction, ExtendedMaze, Maze, RelativeDirection, Walls
+from .maze import Direction, ExtendedMaze, Maze, RelativeDirection
 from .robots import Action, RobotState
 from .robots.utils import build_weighted_graph, dijkstra, direction_to_wall
-from .unionfind import UnionFind
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -76,8 +75,9 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
                         RelativeDirection.LEFT: 4,
                         RelativeDirection.RIGHT: 4,
                     },
+                    start=self._begin,
                 ),
-                self._begin,
+                self._begin[:-1],
                 goals=self._end,
             ).values(),
         )[1]
@@ -234,15 +234,7 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
     def connected(self, a: tuple[int, int] | Iterable[tuple[int, int]], b: tuple[int, int] | Iterable[tuple[int, int]]) -> bool:
         """Check if two cells (or cell groups) are connected in the maze."""
         # Calculate connectivity
-        connectivity: UnionFind[tuple[int, int]] = UnionFind()
-        for row in range(self._maze.height):
-            for col in range(self._maze.width):
-                for missing in ~self._maze[row, col]:
-                    match missing:
-                        case Walls.NORTH: connectivity.union((row, col), (row - 1, col))
-                        case Walls.EAST: connectivity.union((row, col), (row, col + 1))
-                        case Walls.SOUTH: connectivity.union((row, col), (row + 1, col))
-                        case Walls.WEST: connectivity.union((row, col), (row, col - 1))
+        connectivity = self._maze.connectivity
 
         # Normalize input to 2 sets
         def _normalize(maybe_group: tuple[int, int] | Iterable[tuple[int, int]]) -> set[tuple[int, int]]:

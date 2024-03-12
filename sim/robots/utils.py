@@ -16,7 +16,9 @@ from ..maze import Direction, ExtendedMaze, Maze, RelativeDirection, Walls, PRIM
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Generator, Set
-    from typing import Callable, Literal
+    from typing import Callable, Literal, Protocol
+
+    from ..maze import ExtendedMaze, ExtraCellInfo, Maze
 
 ENABLE_VICTORY_DANCE = os.environ.get('MICROMOUSE_VICTORY_DANCE', 'n') == 'y'
 
@@ -92,6 +94,15 @@ class RobotState(NamedTuple):
 if TYPE_CHECKING:
     type Robot = Generator[Action, RobotState, None]
     type Algorithm = Callable[[ExtendedMaze, set[tuple[int, int]]], Robot]
+
+    class SolverAlgorithm(Protocol):  # pylint: disable=missing-class-docstring,too-few-public-methods
+        def __call__(
+            self,
+            maze: ExtendedMaze, goals: set[tuple[int, int]],
+            /, *,
+            pos: RobotState,
+            unknown_cells: Set[tuple[int, int]],
+        ) -> Robot: ...
 
 
 def _wall_to_direction(wall: Walls) -> Direction:
@@ -246,7 +257,7 @@ def abs_turn_to_rel(before: Direction, after: Direction) -> RelativeDirection:
     raise ValueError(f"Turn not supported: {before} -> {after}")
 
 
-type Vertex = tuple[int, int, Direction]
+type Vertex = tuple[int, int, Direction] | tuple[int, int]
 type WeightedGraph = dict[Vertex, dict[Vertex, float]]
 
 
@@ -265,18 +276,19 @@ def build_weighted_graph(
         maze: Maze,
         weights: dict[RelativeDirection, float] | Callable[[RelativeDirection], float],
         *,
-        order: int = 1,
-        diagonals: bool = False,
-        without: Set[tuple[int, int]] = frozenset(),
+        # order: int = 1,
+        # diagonals: bool = False,
+        without: Set[Vertex] = frozenset(),
+        start: tuple[int, int, Direction] | None = None,
 ) -> WeightedGraph:
     """Build a graph from"""
-    if order <= 0:
-        raise ValueError(f"order must be positive: {order}")
-    assert order == 1, "Higher orders not yet supported"
-    assert not diagonals, "Diagonals not yet supported"
+    # if order <= 0:
+    #     raise ValueError(f"order must be positive: {order}")
+    # assert order == 1, "Higher orders not yet supported"
+    # assert not diagonals, "Diagonals not yet supported"
 
     weights = _callable_weights(weights)
-    graph = {}
+    graph: WeightedGraph = {}
 
     for row, col, walls in maze:
         if (row, col) in without:
@@ -285,9 +297,9 @@ def build_weighted_graph(
         # for dist in range(1, order+1):
         for direction in walls_to_directions(walls):
             dest = direction_to_cell((row, col), direction)
-            if dest in without:
+            if dest in without or (*dest, direction) in without:
                 continue
-            graph.setdefault((row, col, direction), {})[*dest, direction.turn_back()] = 0
+            graph.setdefault((row, col, direction), {})[(*dest, direction.turn_back())] = 0
 
         for d1 in PRIMARY_DIRECTIONS:
             v1 = row, col, d1
@@ -302,6 +314,14 @@ def build_weighted_graph(
                 # when arriving from ``d1`` wall, we are facing ``d1.turn_back()``
                 graph[v1][v2] = weights(abs_turn_to_rel(d1.turn_back(), d2))
 
+    if start:
+        row, col, d1 = start
+        for d2 in PRIMARY_DIRECTIONS:
+            v2 = row, col, d2
+            if v2 not in graph:
+                continue
+            graph.setdefault((row, col), {})[v2] = weights(abs_turn_to_rel(d1, d2))
+
     return graph
 
 
@@ -309,9 +329,9 @@ DIJKSTRA_UNREACHABLE: tuple[float, list[Vertex]] = (float('inf'), [])
 
 
 def _reduce_dijkstra_route(weight_route: tuple[float, list[Vertex]], /) -> tuple[float, list[tuple[int, int]]]:
-    reduced_route = []
+    reduced_route: list[tuple[int, int]] = []
     for v in weight_route[1]:
-        cell = v[:-1]
+        cell = v[:2]
         if cell not in reduced_route[-1:]:
             reduced_route.append(cell)
     return weight_route[0], reduced_route
@@ -319,7 +339,7 @@ def _reduce_dijkstra_route(weight_route: tuple[float, list[Vertex]], /) -> tuple
 
 def dijkstra(
         graph: WeightedGraph,
-        src: Vertex,
+        src: tuple[int, int],
         *,
         goals: Set[tuple[int, int]] | tuple[int, int] | None = None,
 ) -> dict[tuple[int, int], tuple[float, list[tuple[int, int]]]]:
@@ -327,7 +347,7 @@ def dijkstra(
 
     Args:
         graph (WeightedGraph): The graph to work with.
-        src (Vertex): The vertex to calculate paths from: (row, col, heading).
+        src (tuple[int, int]): The cell to calculate paths from: (row, col).
         goals (Set[tuple[int, int]] | tuple[int, int] | None, optional):
             If not None, only return paths to the specified cells. Defaults to None.
 
@@ -392,7 +412,7 @@ def dijkstra(
                 ds[v] = new_dist, ds[u][1] + [v]
 
     if goals is None:
-        goals = frozenset(v[:-1] for v in ds)
+        goals = frozenset(v[:2] for v in ds)
     if isinstance(goals, tuple):
         goals = frozenset([goals])
 
@@ -408,6 +428,32 @@ def dijkstra(
         ))
         for goal in goals
     }
+
+
+def mark_unreachable_groups(
+        maze: ExtendedMaze,
+        pos: tuple[int, int],
+        color: tuple[int, int, int] | str | None = 'red',
+) -> None:
+    """Mark all unreachable cells as visited and set their color.
+
+    Args:
+        maze (ExtendedMaze): The maze.
+        pos (tuple[int, int]): The position to determine connectivity to.
+        color (tuple[int, int, int] | str | None, optional): The color to mark with. Defaults to 'red'.
+    """
+    # print(maze.connectivity)
+    for connected_group in maze.connectivity.iter_sets():
+        # All goals should have been connected, this checks if this is the conencted
+        # group that contains the robot and all goals.
+        if pos in connected_group:
+            continue
+        print("unreachable:", connected_group)
+        # Reaching here means this is a disconnected group, mark it as "explored"
+        for cell in connected_group:
+            info: ExtraCellInfo = maze.extra_info[cell]
+            info.visited = 1
+            info.color = color
 
 
 def identity[T](obj: T) -> T:

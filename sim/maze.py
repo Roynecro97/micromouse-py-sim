@@ -18,6 +18,8 @@ from typing import cast, overload, TYPE_CHECKING
 
 import numpy as np
 
+from .unionfind import UnionFind
+
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
     from typing import BinaryIO, Callable, Literal, Self, TextIO, TypeAlias
@@ -185,7 +187,7 @@ class Direction(IntEnum):
                 return Direction.SOUTH_WEST
         raise ValueError(f"{direction!r} is not a valid Direction")
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
@@ -697,7 +699,7 @@ class Maze:
             raise IndexError("TODO: pretty string")
         return Walls(val)
 
-    def __setitem__(self, idx: tuple[int, int], value: Walls):
+    def __setitem__(self, idx: tuple[int, int], value: Walls) -> None:
         if not isinstance(idx, tuple) or len(idx) != 2 or not all(isinstance(i, int) for i in idx):
             raise TypeError(f"expected 2 ints: (row, col), got {idx!r}")
         row, col = idx
@@ -720,12 +722,12 @@ class Maze:
         self._add_neighbor_walls(row, col, value)
         self._remove_neighbor_walls(row, col, ~value)
 
-    def add_walls(self, row: int, col: int, walls: Walls):
+    def add_walls(self, row: int, col: int, walls: Walls) -> None:
         """Add walls to the maze."""
         self._cells[self._index(row, col)] |= walls.value
         self._add_neighbor_walls(row, col, walls)
 
-    def _add_neighbor_walls(self, row: int, col: int, walls: Walls):
+    def _add_neighbor_walls(self, row: int, col: int, walls: Walls) -> None:
         """Add walls to the neighboring cells in the maze."""
         for added in walls:
             match added:
@@ -738,12 +740,12 @@ class Maze:
                 case Walls.WEST if col > 0:
                     self._cells[self._index(row, col - 1)] |= Walls.EAST.value
 
-    def remove_walls(self, row: int, col: int, walls: Walls):
+    def remove_walls(self, row: int, col: int, walls: Walls) -> None:
         """Remove walls from the maze."""
         self._cells[self._index(row, col)] &= (~walls).value
         self._remove_neighbor_walls(row, col, walls)
 
-    def _remove_neighbor_walls(self, row: int, col: int, walls: Walls):
+    def _remove_neighbor_walls(self, row: int, col: int, walls: Walls) -> None:
         """Remove walls from the neighboring cells in the maze."""
         for removed in walls:
             match removed:
@@ -840,7 +842,7 @@ class Maze:
         """Render the maze as text"""
         return '\n'.join(''.join(row) for row in self.render_screen(charset, cell_width, cell_height, force_corners)) + '\n'
 
-    def _validate(self):
+    def _validate(self) -> None:
         """Raises an exception if the maze is not enclosed by walls or if 2 adjacent cells disagree on their shared wall"""
         for idx, cell in enumerate(self._cells):
             walls = Walls(cell)
@@ -878,7 +880,7 @@ class ExtraCellInfo(NumpyCheat):
     color: tuple[int, int, int] | str | None = None  # Maybe a better type here
     visited: int = 0
 
-    def visit_cell(self):
+    def visit_cell(self) -> None:
         """Increase the visit counter for the cell."""
         self.visited += 1
 
@@ -895,11 +897,14 @@ class ExtendedMaze(Maze):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
+        self._connectivity: UnionFind[tuple[int, int]] | None = None
         self._route: Route = []
         self._extra_info: npt.NDArray[ExtraCellInfo] = np.empty(self.size, dtype=ExtraCellInfo)
+        self._curr_gen = 0
+        self._prev_gen = self._curr_gen - 1
         self.reset_info()
 
-    def reset_info(self):
+    def reset_info(self) -> None:
         """Reset the extra info held in the maze."""
         for row in range(self.height):
             for col in range(self.width):
@@ -911,7 +916,7 @@ class ExtendedMaze(Maze):
         return self._extra_info
 
     @extra_info.deleter
-    def extra_info(self):
+    def extra_info(self) -> None:
         """Reset the extra info."""
         self.reset_info()
 
@@ -939,15 +944,96 @@ class ExtendedMaze(Maze):
 
     @property
     def route(self) -> Route:
-        """Get the route for the maze, in (row, col) pairs."""
+        """The route for the maze, in (row, col) pairs."""
         return self._route
 
     @route.setter
-    def route(self, value: RouteLike):
+    def route(self, value: RouteLike) -> None:
         """Set the route for the maze, in (row, col) pairs."""
         self._route = list(value or ())
 
     @route.deleter
-    def route(self):
+    def route(self) -> None:
         """Reset the current route."""
         self._route = []
+
+    def explored_cells_count(self) -> int:
+        """Calculate the number of cells that were visited.
+
+        Returns:
+            int: The number of cells that were visited.
+        """
+        return sum(info.visited > 0 for _, _, info in self.iter_info())
+
+    def explored_cells_percentage(self) -> float:
+        """Calculate the percentage of cells that were visited.
+
+        Returns:
+            float: The percentage of cells that were visited.
+        """
+        return self.explored_cells_count() / self.cell_size
+
+    @property
+    def connectivity(self) -> UnionFind[tuple[int, int]]:
+        """Calculate connected groups in the maze.
+
+        Returns:
+            UnionFind[tuple[int, int]]: All connected groups of cells.
+        """
+        if self._connectivity is None:
+            self._connectivity = UnionFind()
+            for row, col, walls in self:
+                for missing in ~walls:
+                    match missing:
+                        case Walls.NORTH:
+                            self._connectivity.union((row, col), (row - 1, col))
+                        case Walls.EAST:
+                            self._connectivity.union((row, col), (row, col + 1))
+                        case Walls.SOUTH:
+                            self._connectivity.union((row, col), (row + 1, col))
+                        case Walls.WEST:
+                            self._connectivity.union((row, col), (row, col - 1))
+        return self._connectivity
+
+    @connectivity.deleter
+    def connectivity(self) -> None:
+        """Clear connectivity caching."""
+        self._connectivity = None
+
+    def __setitem__(self, idx: tuple[int, int], value: Walls) -> None:
+        old_val = self[idx]
+        try:
+            return super().__setitem__(idx, value)
+        finally:
+            if old_val != self[idx]:
+                self.mark_changed()
+
+    def add_walls(self, row: int, col: int, walls: Walls) -> None:
+        old_val = self[row, col]
+        try:
+            return super().add_walls(row, col, walls)
+        finally:
+            if old_val != self[row, col]:
+                self.mark_changed()
+
+    def remove_walls(self, row: int, col: int, walls: Walls) -> None:
+        old_val = self[row, col]
+        try:
+            return super().remove_walls(row, col, walls)
+        finally:
+            if old_val != self[row, col]:
+                self.mark_changed()
+
+    def mark_changed(self) -> None:
+        """Mark that the maze has changed, regardless of wall changes."""
+        del self.connectivity
+        self._curr_gen = self._prev_gen + 1
+
+    def changed(self) -> bool:
+        """Check whether the maze has changed (added/removed walls) since the last call.
+
+        Returns:
+            bool: True if there was a change since the last call, otherwise False.
+        """
+        prev, self._prev_gen = self._prev_gen, self._curr_gen
+        return prev != self._curr_gen

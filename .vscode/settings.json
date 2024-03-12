@@ -17,6 +17,7 @@
         "blit",
         "dtype",
         "dtypes",
+        "floodijkstra",
         "frompyfunc",
         "KMOD",
         "ndarray",
