@@ -11,10 +11,10 @@ import random
 from enum import auto, Enum
 from typing import NamedTuple, overload, TYPE_CHECKING
 
-from ..maze import Direction, ExtendedMaze, Maze, RelativeDirection, Walls
+from ..maze import Direction, ExtendedMaze, Maze, RelativeDirection, Walls, PRIMARY_DIRECTIONS
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Generator
+    from collections.abc import Iterable, Generator, Set
     from typing import Callable, Literal
 
 ENABLE_VICTORY_DANCE = os.environ.get('MICROMOUSE_VICTORY_DANCE', 'n') == 'y'
@@ -243,6 +243,64 @@ def abs_turn_to_rel(before: Direction, after: Direction) -> RelativeDirection:
     if before.turn_right() == after:
         return RelativeDirection.RIGHT
     raise ValueError(f"Turn not supported: {before} -> {after}")
+
+
+type Vertex = tuple[int, int, Direction]
+
+
+def _callable_weights(
+        weights: dict[RelativeDirection, float] | Callable[[RelativeDirection], float],
+) -> Callable[[RelativeDirection], float]:
+    if isinstance(weights, dict):
+        if len(weights) != len(RelativeDirection):
+            raise ValueError(f"missing weights: {', '.join(map(str, set(RelativeDirection) - set(weights)))}")
+
+        return weights.__getitem__
+    return weights
+
+
+def build_weighted_graph(
+        maze: ExtendedMaze,
+        weights: dict[RelativeDirection, float] | Callable[[RelativeDirection], float],
+        *,
+        order: int = 1,
+        diagonals: bool = False,
+        without: Set[tuple[int, int]] = frozenset(),
+) -> dict[Vertex, dict[Vertex, float]]:
+    """Build a graph from"""
+    if order <= 0:
+        raise ValueError(f"order must be positive: {order}")
+    assert order == 1, "Higher orders not yet supported"
+    assert not diagonals, "Diagonals not yet supported"
+
+    weights = _callable_weights(weights)
+    graph = {}
+
+    for row, col, walls in maze:
+        if (row, col) in without:
+            continue
+
+        # for dist in range(1, order+1):
+        for direction in walls_to_directions(walls):
+            dest = direction_to_cell((row, col), direction)
+            if dest in without:
+                continue
+            graph.setdefault((row, col, direction), {})[*dest, direction.turn_back()] = 0
+
+        for d1 in PRIMARY_DIRECTIONS:
+            v1 = row, col, d1
+            if v1 not in graph:
+                continue
+            for d2 in PRIMARY_DIRECTIONS:
+                if d2 == d1:
+                    continue
+                v2 = row, col, d2
+                if v2 not in graph:
+                    continue
+                # when arriving from ``d1`` wall, we are facing ``d1.turn_back()``
+                graph[v1][v2] = weights(abs_turn_to_rel(d1.turn_back(), d2))
+
+    return graph
 
 
 def identity[T](obj: T) -> T:

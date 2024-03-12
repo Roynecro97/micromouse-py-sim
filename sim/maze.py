@@ -189,6 +189,21 @@ class Direction(IntEnum):
         return self.name
 
 
+PRIMARY_DIRECTIONS = frozenset([
+    Direction.NORTH,
+    Direction.EAST,
+    Direction.SOUTH,
+    Direction.WEST,
+])
+
+SECONDARY_DIRECTIONS = frozenset([
+    Direction.NORTH_EAST,
+    Direction.NORTH_WEST,
+    Direction.SOUTH_EAST,
+    Direction.SOUTH_WEST,
+])
+
+
 class Walls(Flag):
     """Bit masks for the walls."""
     NORTH = 0x1
