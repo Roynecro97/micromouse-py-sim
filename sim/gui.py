@@ -56,6 +56,8 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
         initial_screen_size = (1280, 720)
         screen = pg.display.set_mode(initial_screen_size, pg.RESIZABLE)
         pg.display.set_caption('Micromouse')
+        self.step_delay = timedelta(seconds=0.5)
+        self.step_min_delay = timedelta(milliseconds=1)
         self.screen = screen
         self.wall_thickness = 5
         self.wall_color = 'red'
@@ -64,11 +66,46 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
         self.goal_color = 'green'
         self.heatmap_colors = ['blue', 'cyan', 'green', 'yellow', 'orange', 'red', 'brown']
         self.ui_manager = pygame_gui.UIManager((screen.get_width(), screen.get_height()))
-        self.start_button = pygame_gui.elements.UIButton(relative_rect=pg.Rect((0, 0), (0, 0)), text='Start', manager=self.ui_manager)
+        self.start_button = pygame_gui.elements.UIButton(
+            relative_rect=pg.Rect((0, 0), (0, 0)),
+            text='Start',
+            manager=self.ui_manager,
+        )
         self.start_button.tool_tip_text = "Shortcut: 's'"
-        self.step_button = pygame_gui.elements.UIButton(relative_rect=pg.Rect((0, 0), (0, 0)), text='Step', manager=self.ui_manager)
+        self.step_button = pygame_gui.elements.UIButton(
+            relative_rect=pg.Rect((0, 0), (0, 0)),
+            text='Step',
+            manager=self.ui_manager,
+        )
         self.step_button.tool_tip_text = "Shortcut: 'n'"
-        self.robot_dropdown = pygame_gui.elements.UIDropDownMenu(list(ROBOTS), 'Idle', pg.Rect((0, 0), (0, 0)), self.ui_manager)
+        # self.browse_button = pygame_gui.elements.UIButton(
+        #    relative_rect=pg.Rect((0, 0), (0, 0)),
+        #    text='Browse maze file',
+        #    manager=self.ui_manager,
+        # )
+        # maze_list = ["Custom", "Maze 2"]
+        # self.maze_dropdown = pygame_gui.elements.UIDropDownMenu(
+        #    maze_list,
+        #    maze_list[0],
+        #    pg.Rect((0, 0), (0, 0)),
+        #    self.ui_manager,
+        # )
+        self.robot_dropdown = pygame_gui.elements.UIDropDownMenu(
+            list(ROBOTS),
+            'Idle',
+            pg.Rect((0, 0), (0, 0)),
+            self.ui_manager,
+        )
+
+        # self.browse_maze_file_dialog = None
+        # self.maze_path = ''
+
+        self.sim_speed_slider = pygame_gui.elements.UIHorizontalSlider(
+            relative_rect=pg.Rect((0, 0), (0, 0)),
+            start_value=self.step_delay.total_seconds(),
+            value_range=(0.0, 1.0),
+            manager=self.ui_manager,
+        )
 
         self.sim_auto_step = True
         self.sim = sim
@@ -85,7 +122,7 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
     def run(self):
         """Run the GUI
         """
-        # self.configure_simulator()
+        self.configure_simulator()
         self.scale()
         self.main_loop()
         pg.quit()
@@ -94,7 +131,7 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
         """Fetch the selected robot.
 
         Returns:
-            Robot: The chosen robot
+            Robot: The chosen robot.
         """
         return ROBOTS[self.robot_dropdown.selected_option]
 
@@ -105,24 +142,25 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
             Maze: The selected maze.
         """
         return ('mazes/semifinal.maze', (15, 0, Direction.EAST), {(8, 8), (7, 8), (8, 7), (7, 7)})
+        # return ('mazes/simple.maze', (0, 0, Direction.SOUTH), {(1, 2)})
 
     def configure_simulator(self):
         """Configure the simulator with the chosen maze preset and robot."""
-        self.sim_auto_step = True
-        maze_file, begin, end = self.get_selected_maze()
-        self.sim = Simulator(
-            alg=self.get_selected_robot(),
-            maze=Maze.from_file(maze_file),
-            begin=begin,
-            end=end,
-        )
+        # self.sim_auto_step = True
+        # maze_file, begin, end = self.get_selected_maze()
+        # self.sim = Simulator(
+        #    alg=self.get_selected_robot(),
+        #    maze=Maze.from_file(maze_file),
+        #    begin=begin,
+        #    end=end,
+        # )
         self.scale()
 
     def process_event(self, event: pg.Event):
         """Process pygame event.
 
         Args:
-            event (pg.Event): the event to process.
+            event (pg.Event): The event to process.
         """
         self.ui_manager.process_events(event)
         if event.type == pygame_gui.UI_BUTTON_PRESSED:
@@ -131,7 +169,25 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
             elif event.ui_element == self.step_button:
                 self.sim_auto_step = False
                 self.sim.step()
+            # elif event.ui_element == self.browse_button:
+            #    self.browse_maze_file_dialog = pygame_gui.windows.UIFileDialog(
+            #        rect=pg.Rect(
+            #            0,
+            #            0,
+            #            500,
+            #            500),
+            #        manager=self.ui_manager,
+            #        window_title="Select maze",
+            #        initial_file_path="./mazes/",
+            #        allow_existing_files_only=True,
+            #    )
+            #    self.browse_maze_file_dialog.set_blocking(True)
+            # if self.browse_maze_file_dialog is not None and event.ui_element == self.browse_maze_file_dialog.ok_button:
+            #    self.maze_path = self.browse_maze_file_dialog.current_file_path
+            #    print(self.maze_path)  # TODO: use path to create maze...
         elif event.type == pygame_gui.UI_DROP_DOWN_MENU_CHANGED:
+            # if event.ui_element == self.maze_dropdown:
+            #    self.configure_simulator()
             if event.ui_element == self.robot_dropdown:
                 self.sim_auto_step = False
                 self.sim.restart(self.get_selected_robot())
@@ -154,6 +210,7 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
             time_delta (float): The time passed since the last call to update, in seconds.
         """
         self.start_button.set_text('Stop' if self.sim_auto_step else 'Start')
+        self.step_delay = timedelta(seconds=self.sim_speed_slider.get_current_value())
 
         self.ui_manager.update(time_delta)
         self.ui_manager.draw_ui(self.screen)
@@ -167,18 +224,30 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
             goal_cells: Iterable[tuple[int, int]] = (),
             robot_pos: tuple[int, int] = (0, 0),
             robot_direction: Direction = Direction.NORTH,
+            *,
             heatmap: bool = False,
     ):  # pylint: disable=too-many-arguments,too-many-locals
         """Draw the maze on screen.
 
         Args:
-            maze (Maze): maze to draw.
-            tile_size (int): the size of a maze's single tile
-            offset (tuple[int, int], optional): offset for maze in pixels from (0, 0). Defaults to (0, 0).
-            robot_pos (tuple[int, int], optional): position of robot in maze (row, col). Defaults to (0, 0).
-            robot_direction (Direction): direction robot is facing. Defaults to north.
+            maze (Maze): Maze to draw.
+            tile_size (int): The size of a maze's single tile.
+            offset (tuple[int, int], optional): Offset for maze in pixels from (0, 0). Defaults to (0, 0).
+            robot_pos (tuple[int, int], optional): Position of robot in maze (row, col). Defaults to (0, 0).
+            robot_direction (Direction): Direction robot is facing. Defaults to north.
+            heatmap (bool): Draw heatmap on maze. Defaults to False.
         """
-        color = pg.Color(self.wall_color)
+        # Draw robot's route before all other maze elements:
+        for i, cell in enumerate(maze.route):
+            x1 = cell[1] * tile_size + offset[0]
+            y1 = cell[0] * tile_size + offset[1]
+            if i + 1 < len(maze.route):
+                next_cell = maze.route[i + 1]
+                x2 = next_cell[1] * tile_size + offset[0]
+                y2 = next_cell[0] * tile_size + offset[1]
+                self.draw_route_cell(Position(x1, y1), Position(x2, y2), 'magenta')
+
+        wall_color = pg.Color(self.wall_color)
         for row, col, walls in maze:
             x = col * tile_size + offset[0]
             y = row * tile_size + offset[1]
@@ -186,90 +255,112 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
             extra_info = maze.extra_info[row, col]
 
             if heatmap:
-                self.draw_heatmap(extra_info, current_pos, tile_size)
+                self.draw_heatmap(extra_info, current_pos)
 
             for cell in goal_cells:
                 if (row, col) == cell:
                     pg.draw.rect(self.screen, self.goal_color, pg.Rect(x, y, tile_size, tile_size))
 
-            self.draw_tile_color(extra_info, current_pos, tile_size)
+            self.fill_cell_color(extra_info.color, current_pos, 128)
 
             if (col, row) == robot_pos:
-                self.draw_robot(current_pos, robot_direction, tile_size)
+                self.draw_robot(current_pos, robot_direction)
 
             if extra_info.weight is not None:
-                self.draw_text(str(extra_info.weight), tile_size // 2, current_pos + Position(tile_size // 2, tile_size // 2))
+                self.draw_text_by_center(str(extra_info.weight), tile_size // 2, current_pos + Position(tile_size // 2, tile_size // 2))
 
             line_end = self.wall_thickness // 2
             if Walls.NORTH in walls:
-                pg.draw.line(self.screen, color, (x - line_end, y), (x + line_end + tile_size, y), self.wall_thickness)
+                pg.draw.line(self.screen, wall_color, (x - line_end, y), (x + line_end + tile_size, y), self.wall_thickness)
             if Walls.EAST in walls:
-                pg.draw.line(self.screen, color, (x + tile_size, y - line_end),
+                pg.draw.line(self.screen, wall_color, (x + tile_size, y - line_end),
                              (x + tile_size, y + line_end + tile_size), self.wall_thickness)
             if Walls.SOUTH in walls:
-                pg.draw.line(self.screen, color, (x - line_end, y + tile_size),
+                pg.draw.line(self.screen, wall_color, (x - line_end, y + tile_size),
                              (x + line_end + tile_size, y + tile_size), self.wall_thickness)
             if Walls.WEST in walls:
-                pg.draw.line(self.screen, color, (x, y - line_end), (x, y + line_end + tile_size), self.wall_thickness)
+                pg.draw.line(self.screen, wall_color, (x, y - line_end), (x, y + line_end + tile_size), self.wall_thickness)
 
-    def draw_heatmap(self, info: ExtraCellInfo, cell_pos: Position, tile_size: int):
+    def fill_cell_color(self, color: tuple[int, int, int] | str | None, pos: Position, alpha: int = 255):
+        """Fills a cell with color
+
+        Args:
+            color (tuple[int, int, int] | str | None): Cell color to draw.
+            pos (Position): Cell position in pixels.
+            alpha (int, optional): Color's transparent value. Defaults to 255.
+        """
+        if color is not None:
+            pg_color = pg.Color(color)
+            alpha_surface = pg.Surface((self.tile_size, self.tile_size), pg.SRCALPHA)
+            alpha_surface.fill((pg_color.r, pg_color.g, pg_color.b, alpha))
+            self.screen.blit(alpha_surface, pos)
+
+    def draw_round_corners_line(self, start: tuple[int, int], end: tuple[int, int], color: pg.Color, width: int):
+        """Draw a line with round edges.
+
+        Args:
+            start (tuple[int, int]): Start point on surface.
+            end (tuple[int, int]): End point on surface.
+            color (pg.Color): Line's color.
+            width (int): Line's width.
+        """
+        pg.draw.line(self.screen, color, start, end, width)
+        pg.draw.circle(self.screen, color, start, width // 2)
+        pg.draw.circle(self.screen, color, end, width // 2)
+
+    def draw_route_cell(self, current_pos: Position, next_pos: Position, color: tuple[int, int, int] | str | None, alpha: int = 255):
+        """Draw a cell in route
+
+        Args:
+            current_pos (Position): The current position of the route.
+            next_pos (Position): The next position of the route.
+            color (tuple[int, int, int] | str | None): The color to draw with.
+            alpha (int, optional): Color's transparent value. Defaults to 255.
+        """
+        if color is not None:
+            pg_color = pg.Color(color)
+            pg_color.a = alpha
+            current_pos += Position(self.half_tile, self.half_tile)
+            next_pos += Position(self.half_tile, self.half_tile)
+            self.draw_round_corners_line(current_pos, next_pos, pg_color, 3)
+
+    def draw_heatmap(self, info: ExtraCellInfo, cell_pos: Position):
         """Fill cell color by visit count to produce a heatmap.
 
         Args:
-            info (ExtraCellInfo): cell info to draw.
-            cell_pos (Position): cell position in pixels.
-            tile_size (int): the size of a maze's single tile.
+            info (ExtraCellInfo): Cell info to draw.
+            cell_pos (Position): Cell position in pixels.
         """
         color = None
         if info.color is not None:
-            color = pg.Color(info.color)
+            color = info.color
         elif info.visited > 0:
-            color = pg.Color(self.heatmap_colors[min(info.visited, len(self.heatmap_colors)) - 1])
+            color = self.heatmap_colors[min(info.visited, len(self.heatmap_colors)) - 1]
 
-        if color is not None:
-            alpha_surface = pg.Surface((tile_size, tile_size), pg.SRCALPHA)
-            alpha_surface.fill((color.r, color.g, color.b, 200))
-            pg.draw.rect(alpha_surface, color, pg.Rect(cell_pos.row, cell_pos.col, tile_size, tile_size))
-            self.screen.blit(alpha_surface, cell_pos)
+        self.fill_cell_color(color, cell_pos, 200)
 
-    def draw_tile_color(self, info: ExtraCellInfo, cell_pos: Position, tile_size: int):
-        """Fill cell with info color.
-
-        Args:
-            info (ExtraCellInfo): cell info to draw.
-            cell_pos (Position): cell position in pixels.
-            tile_size (int): the size of a maze's single tile.
-        """
-        if info.color is not None:
-            alpha_surface = pg.Surface((tile_size, tile_size), pg.SRCALPHA)
-            color = pg.Color(info.color)
-            alpha_surface.fill((color.r, color.g, color.b, 128))
-            pg.draw.rect(alpha_surface, color, pg.Rect(cell_pos.row, cell_pos.col, tile_size, tile_size))
-            self.screen.blit(alpha_surface, cell_pos)
-
-    def draw_robot(self, robot_pos: Position, robot_direction: Direction, tile_size: int):
+    def draw_robot(self, robot_pos: Position, robot_direction: Direction):
         """Draw robot on screen.
 
         Args:
-            robot_pos (Position): position of robot in maze (in pixels).
-            robot_direction (Direction): direction robot is facing.
-            tile_size (int): the size of a maze's single tile.
+            robot_pos (Position): Position of robot in maze (in pixels).
+            robot_direction (Direction): The direction in which robot is facing.
         """
-        robot_radius = (tile_size * 0.8) // 2
-        robot_pos = robot_pos + Position(tile_size // 2, tile_size // 2)
+        robot_radius = self.half_tile * 0.8
+        robot_pos = robot_pos + Position(self.half_tile, self.half_tile)
         pg.draw.circle(self.screen, self.robot_main_color, robot_pos, robot_radius)
         heading_point = robot_pos + Position(round(robot_radius * math.cos(robot_direction.to_radians())),
                                              round(robot_radius * math.sin(robot_direction.to_radians())))
         pg.draw.line(self.screen, self.robot_second_color, robot_pos, heading_point, 1)
 
-    def draw_text(self, text: str, size: int, center: Position, color='white'):
-        """Draw text on screen.
+    def draw_text_by_center(self, text: str, size: int, center: Position, color='white'):
+        """Draw text on screen by the position of the center of the text rectangle.
 
         Args:
-            text (str): text to draw.
-            size (int): size of text.
-            center (Position): center of text on screen (x, y).
-            color (str, optional): text's color. Defaults to 'white'.
+            text (str): Text to draw.
+            size (int): Size of text.
+            center (Position): Position of center of text on screen (x, y).
+            color (str, optional): Text's color. Defaults to 'white'.
         """
         font = pg.font.Font(pg.font.get_default_font(), size)
         render_text = font.render(text, True, color)
@@ -277,33 +368,47 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
         text_rect.center = center
         self.screen.blit(render_text, text_rect)
 
+    def draw_text(self, text: str, size: int, top_left: Position, color='white'):
+        """Draw text on screen by the position of the top left corner of the text rectangle.
+
+        Args:
+            text (str): Text to draw.
+            size (int): Size of text.
+            top_left (Position): Position of top left of text on screen (x, y).
+            color (str, optional): Text's color. Defaults to 'white'.
+        """
+        font = pg.font.Font(pg.font.get_default_font(), size)
+        render_text = font.render(text, True, color)
+        text_rect = render_text.get_rect()
+        text_rect.topleft = top_left
+        self.screen.blit(render_text, text_rect)
+
     def scale(self):
         """Calculate sizes and offsets of GUI elements according to screen size."""
         self.screen_width, self.screen_height = pg.display.get_surface().get_size()
         self.ui_manager.set_window_resolution((self.screen_width, self.screen_height))
-        self.text_size = 4 * min(self.screen_width, self.screen_height) // 100
-        self.tile_size = min(self.screen_width // (2 * self.sim.maze.width + 3), self.screen_height // (self.sim.maze.height + 5))
+        self.text_size = 24
+        self.tile_size = min(self.screen_width // (2 * self.sim.maze.width + 3), self.screen_height // (self.sim.maze.height + 7))
         self.half_tile = self.tile_size // 2
-        self.full_maze_offset = Position(self.tile_size, 4 * self.tile_size)
+        self.full_maze_offset = Position(self.tile_size, 6 * self.tile_size)
         self.full_maze_center = self.full_maze_offset + Position(self.sim.maze.width * self.half_tile, 0)
         self.robot_maze_offset = self.full_maze_offset + Position((self.sim.maze.width + 1) * self.tile_size, 0)
         self.robot_maze_center = self.robot_maze_offset + Position(self.sim.maze.width * self.half_tile, 0)
-        self.start_button.set_position((self.screen_width // 2 - 2 * self.tile_size, 2 * self.tile_size))
-        self.start_button.set_dimensions((3 * self.tile_size, self.tile_size))
-        self.step_button.set_position((self.screen_width // 2 + 2 * self.tile_size, 2 * self.tile_size))
-        self.step_button.set_dimensions((3 * self.tile_size, self.tile_size))
-        self.robot_dropdown.set_position((self.screen_width // 2, 0))
-        self.robot_dropdown.set_dimensions((5 * self.tile_size, self.tile_size))
+        self.start_button.set_position((self.screen_width // 2 - 2 * self.tile_size, 0.5 * self.text_size))
+        self.start_button.set_dimensions((3 * self.tile_size, 1.5 * self.text_size))
+        self.step_button.set_position((self.screen_width // 2 + 2 * self.tile_size, 0.5 * self.text_size))
+        self.step_button.set_dimensions((3 * self.tile_size, 1.5 * self.text_size))
+        self.sim_speed_slider.set_position((self.screen_width // 2 + 8 * self.tile_size, 0.5 * self.text_size))
+        self.sim_speed_slider.set_dimensions((10 * self.text_size, 1.5 * self.text_size))
+        # self.browse_button.set_position((8 * self.tile_size, 0))
+        # self.browse_button.set_dimensions((5 * self.tile_size, self.tile_size))
+        # self.maze_dropdown.set_position((5 * self.text_size, 0))
+        # self.maze_dropdown.set_dimensions((4 * self.tile_size, self.tile_size))
+        self.robot_dropdown.set_position((6 * self.text_size, 0.5 * self.text_size))
+        self.robot_dropdown.set_dimensions((10 * self.text_size, 1.5 * self.text_size))
 
     def main_loop(self):  # pylint: disable=too-many-locals
-        """Main GUI loop. This function will stay in a loop.
-
-        Args:
-            screen (pg.surface.Surface): screen to draw on.
-            sim (Simulator): the micromouse simulator to draw.
-        """
-        step_min_delay = timedelta(milliseconds=100)
-        step_delay = timedelta(seconds=0.5)
+        """Main GUI loop. This function will stay in a loop until exit."""
         last_step = datetime.now()
         clock = pg.time.Clock()
         while True:
@@ -312,7 +417,7 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
             now = datetime.now()
 
             if pg.key.get_pressed()[pg.K_SPACE]:
-                step = now - last_step >= step_min_delay
+                step = now - last_step >= self.step_min_delay
 
             for event in pg.event.get():
                 if event.type == pg.QUIT:
@@ -325,12 +430,11 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
 
                 self.process_event(event)
 
-            if now - last_step >= step_delay:
+            if now - last_step >= self.step_delay:
                 step = True
 
             if self.sim.status in (SimulationStatus.ERROR, SimulationStatus.FINISHED):
                 step = False
-                self.sim_auto_step = False
 
             if step and self.sim_auto_step:
                 self.sim.step()
@@ -338,15 +442,66 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
                 print(f"GUI: after step - {self.sim.maze[self.sim.robot_pos[:-1]]=} {self.sim.robot_maze[self.sim.robot_pos[:-1]]=}")
 
             self.screen.fill("black")
-            self.draw_text('Full Maze', self.text_size, self.full_maze_center + Position(0, -self.half_tile))
-            self.draw_text('Robot View', self.text_size, self.robot_maze_center + Position(0, -self.half_tile))
+            self.draw_text_by_center(
+                'Full Maze',
+                self.text_size,
+                self.full_maze_center + Position(0, -self.half_tile),
+            )
+            self.draw_text_by_center(
+                'Robot View',
+                self.text_size,
+                self.robot_maze_center + Position(0, -self.half_tile),
+            )
             robot_y, robot_x, robot_heading = self.sim.robot_pos
-            self.draw_maze(self.sim.maze, self.tile_size, self.full_maze_offset,
-                           self.sim.end, (robot_x, robot_y), robot_heading, heatmap=True)
-            self.draw_maze(self.sim.robot_maze, self.tile_size, self.robot_maze_offset, self.sim.end, (robot_x, robot_y), robot_heading)
+            self.draw_maze(
+                self.sim.maze,
+                self.tile_size,
+                self.full_maze_offset,
+                self.sim.end,
+                (robot_x, robot_y),
+                robot_heading,
+                heatmap=True,
+            )
+            self.draw_maze(
+                self.sim.robot_maze,
+                self.tile_size,
+                self.robot_maze_offset,
+                self.sim.end,
+                (robot_x, robot_y),
+                robot_heading,
+            )
 
             # texts for menus:
-            self.draw_text('Algorithm:', self.text_size, Position(self.screen_width // 2 - 110, self.half_tile))
+            # self.draw_text(
+            #    'Preset:',
+            #    self.text_size,
+            #    Position(0, 0),
+            # )
+            self.draw_text(
+                'Algorithm:',
+                self.text_size,
+                Position(0, int(0.6 * self.text_size)),
+            )
+            # self.draw_text(
+            #    f'Maze file: {self.maze_path}',
+            #    self.text_size,
+            #    Position(0, self.tile_size + self.half_tile),
+            # )
+            self.draw_text(
+                f'Entrance: {self.sim.begin[:2]} Facing: {self.sim.begin[2]}',
+                self.text_size,
+                Position(0, 2 * self.tile_size + self.half_tile),
+            )
+            self.draw_text(
+                f'Goal(s): {self.sim.end}',
+                self.text_size,
+                Position(0, 3 * self.tile_size + self.half_tile),
+            )
+            self.draw_text(
+                f'Simulation Delay [s]: {self.sim_speed_slider.get_current_value():.3f}',
+                self.text_size,
+                Position(self.screen_width // 2 + 7 * self.tile_size, 2 * self.text_size),
+            )
 
             self.update(time_delta)
 
