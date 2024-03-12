@@ -1,18 +1,24 @@
 """flood fill robot
 
 Uses flood-fill to get to the goal and then back to the start,
-then uses an optimal route.
+then uses an "optimal" route (by default, also using flood-fill).
 """
 
 from __future__ import annotations
 
+import heapq
+import math
+
+from functools import partial
 from typing import Protocol, TypedDict, TYPE_CHECKING
 
 from .utils import Action, adjacent_cells, direction_to_cell, shuffled, walls_to_directions
-from ..maze import Direction
+from .utils import build_weighted_graph, identity, Vertex
+from .const import predetermined_path_robot
+from ..maze import Direction, RelativeDirection
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Set
     from typing import Callable, Unpack
     from ..maze import ExtendedMaze, ExtraCellInfo
     from .utils import Algorithm, Robot
@@ -24,9 +30,8 @@ class WeightArgs(TypedDict, total=True):
     """Arguments for weighted calculators."""
     maze: ExtendedMaze
     cell: tuple[int, int]
+    info: ExtraCellInfo
     marker: int
-    robot_pos: tuple[int, int]
-    robot_direction: Direction
 
 
 class WeightCalc(Protocol):  # pylint: disable=too-few-public-methods
@@ -36,8 +41,7 @@ class WeightCalc(Protocol):  # pylint: disable=too-few-public-methods
         ...
 
 
-UNREACHABLE_WEIGHT = float('inf')
-
+UNREACHABLE_WEIGHT = math.inf
 
 
 def simple_flood_weight(**kwargs: Unpack[WeightArgs]) -> float:
@@ -52,7 +56,7 @@ def simple_flood_weight_with_norm_visit_bias(**kwargs: Unpack[WeightArgs]) -> fl
     """
     if kwargs['marker'] == 0:
         return 0
-    return kwargs['marker'] + bool(kwargs['maze'].extra_info[kwargs['cell']].visited)
+    return kwargs['marker'] + bool(kwargs['info'].visited)
 
 
 def simple_flood_weight_with_strong_visit_bias(**kwargs: Unpack[WeightArgs]) -> float:
@@ -62,7 +66,7 @@ def simple_flood_weight_with_strong_visit_bias(**kwargs: Unpack[WeightArgs]) -> 
     """
     if kwargs['marker'] == 0:
         return 0
-    return kwargs['marker'] + kwargs['maze'].extra_info[kwargs['cell']].visited
+    return kwargs['marker'] + round(kwargs['info'].visited * 0.5)
 
 
 def weight_with_avoid_cells(weight: WeightCalc, avoid: set[tuple[int, int]], avoid_weight: float = UNREACHABLE_WEIGHT) -> WeightCalc:
@@ -94,10 +98,8 @@ def weight_with_avoid_cells(weight: WeightCalc, avoid: set[tuple[int, int]], avo
 def calc_flood_fill(
         maze: ExtendedMaze,
         goals: set[tuple[int, int]],
-        robot_pos: tuple[int, int],
-        robot_direction: Direction,
         weight: WeightCalc = simple_flood_weight,
-):
+) -> None:
     """Calculates flood-fill weights *in place*.
 
     Args:
@@ -124,9 +126,8 @@ def calc_flood_fill(
             info.weight = _calc_weight(
                 maze=maze,
                 cell=cell,
+                info=info,
                 marker=marker,
-                robot_pos=robot_pos,
-                robot_direction=robot_direction,
             )
         marker += 1
         seen.update(current)
@@ -143,12 +144,17 @@ def calc_flood_fill(
     assert len(seen) == maze.cell_size, f"new cells created ({len(seen)}/{maze.cell_size})"
 
 
-def single_flood_fill(
+def _do_nothing() -> None:
+    pass
+
+
+def single_flood_fill(  # pylint: disable=too-many-locals
         maze: ExtendedMaze,
         goals: set[tuple[int, int]],
         *,
         weight: WeightCalc = simple_flood_weight,
         minor_priority: MinorPriority = shuffled,
+        recalculate_flood: bool = True,
 ) -> Robot:
     """A robot that solves the maze using a simple implementation of the flood-fill algorithm.
 
@@ -160,18 +166,33 @@ def single_flood_fill(
         assert cell.weight is not None, f"unweighted cell: {dst}"
         return cell.weight, cell.visited
 
-    pos_row, pos_col, facing = yield Action.READY
-    maze.route.append(pos := (pos_row, pos_col))
-
-    while pos not in goals:
-        maze.extra_info[pos_row, pos_col].visit_cell()
+    def _calc_flood_fill() -> None:
         calc_flood_fill(
             maze=maze,
             goals=goals,
-            robot_pos=(pos_row, pos_col),
-            robot_direction=facing,
             weight=weight,
         )
+
+    if recalculate_flood:
+        _initial_calc_flood_fill = _do_nothing
+        _loop_calc_flood_fill = _calc_flood_fill
+    else:
+        _initial_calc_flood_fill = _calc_flood_fill
+        _loop_calc_flood_fill = _do_nothing
+
+    def _assert_turn(r: int, c: int, facing: Direction):
+        assert (r, c) == pos, "moved while turning"
+        assert maze[r, c] == walls, "walls changed while turning"
+        assert facing == new_direction, "turning failed"
+
+    pos_row, pos_col, facing = yield Action.READY
+    maze.route.append(pos := (pos_row, pos_col))
+
+    _initial_calc_flood_fill()
+
+    while pos not in goals:
+        maze.extra_info[pos_row, pos_col].visit_cell()
+        _loop_calc_flood_fill()
         walls = maze[pos_row, pos_col]
         print(f"floodmouse: at {pos} facing {facing} with {walls}")
         new_direction = min(
@@ -194,23 +215,11 @@ def single_flood_fill(
                 turn_action = Action.TURN_RIGHT
             else:
                 raise AssertionError(f"invalid turn from {facing} to {new_direction}")
-            r, c, facing = yield turn_action
-            assert (r, c) == pos, "moved while turning"
-            assert maze[r, c] == walls, "walls changed while turning"
-            assert facing == new_direction, "turning failed"
+            _assert_turn(*(yield turn_action))
             print(f"floodmouse: now facing {facing}, will move forward")
             action = Action.FORWARD
         pos_row, pos_col, facing = yield action
         maze.route.append(pos := (pos_row, pos_col))
-
-
-def _simple_flood_fill(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot:
-    """A robot that solves the maze using a simple implementation of the flood-fill algorithm.
-
-    Returns:
-        Robot: The robot's brain.
-    """
-    return single_flood_fill(maze, goals)
 
 
 def flood_fill_explore(
@@ -233,16 +242,27 @@ def flood_fill_explore(
         Robot: The robot's exploration brain.
     """
     # Initial flood-fill to the goal
-    yield from single_flood_fill(maze, goals, weight=weight, minor_priority=minor_priority)
+    yield from single_flood_fill(
+        maze,
+        goals,
+        weight=weight,
+        minor_priority=minor_priority,
+    )
+
     # Mark the starting point as the new goal and flood-fill to get there
     starting_pos = maze.route[0]
     maze.extra_info[starting_pos].color = "green"
     for goal in goals:
         maze.extra_info[goal].color = "blue"
-    yield from single_flood_fill(maze, {starting_pos}, weight=weight, minor_priority=minor_priority)
+    yield from single_flood_fill(
+        maze,
+        {starting_pos},
+        weight=weight,
+        minor_priority=minor_priority,
+    )
 
 
-def flood_fill_robot(
+def flood_fill_robot(  # pylint: disable=too-many-arguments
         *,
         weight: WeightCalc = simple_flood_weight,
         minor_priority: MinorPriority = shuffled,
@@ -280,7 +300,12 @@ def flood_fill_robot(
         Returns:
             Robot: The robot's brain.
         """
-        yield from flood_fill_explore(maze, goals, weight=weight, minor_priority=minor_priority)
+        yield from flood_fill_explore(
+            maze,
+            goals,
+            weight=weight,
+            minor_priority=minor_priority,
+        )
 
         # Remember unknown cells so we can avoid them later
         unknown_cells = {
@@ -298,6 +323,7 @@ def flood_fill_robot(
             goals,
             weight=weight_with_avoid_cells(final_weight, unknown_cells, final_unknown_penalty),
             minor_priority=final_minor_priority,
+            recalculate_flood=math.isinf(final_unknown_penalty) and final_unknown_penalty > 0,
         )
 
     return _flood_fill_robot_impl
@@ -309,4 +335,188 @@ def simple_flood_fill(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot:
     Returns:
         Robot: The robot's brain.
     """
-    return flood_fill_robot()(maze, goals)
+    return flood_fill_robot(final_unknown_penalty=0)(maze, goals)
+
+
+DIJKSTRA_UNREACHABLE: tuple[float, list[Vertex]] = (math.inf, [])
+
+
+def _reduce_dijkstra_route(weight_route: tuple[float, list[Vertex]], /) -> tuple[float, list[tuple[int, int]]]:
+    reduced_route = []
+    for v in weight_route[1]:
+        cell = v[:-1]
+        if cell not in reduced_route[-1:]:
+            reduced_route.append(cell)
+    return weight_route[0], reduced_route
+
+
+def _dijkstra(  # pylint: disable=too-many-arguments
+        maze: ExtendedMaze,
+        src: Vertex,
+        weights: dict[RelativeDirection, float] | Callable[[RelativeDirection], float],
+        goals: Set[tuple[int, int]] | tuple[int, int] | None = None,
+        without: Set[tuple[int, int]] = frozenset(),
+) -> dict[tuple[int, int], tuple[float, list[tuple[int, int]]]]:
+    graph = build_weighted_graph(maze, weights, without=without)
+    ds: dict[Vertex, tuple[float, list[Vertex]]] = {src: (0, [src])}
+
+    def _distance(v: Vertex, /) -> float:
+        return ds.get(v, DIJKSTRA_UNREACHABLE)[0]
+
+    class CompareByDistance:
+        """For heapq"""
+
+        def __init__(self, v: Vertex):
+            self.v = v
+
+        def __eq__(self, other: CompareByDistance | Vertex) -> bool:
+            if isinstance(other, CompareByDistance):
+                other = other.v
+            return _distance(self.v) == _distance(other)
+
+        def __lt__(self, other: CompareByDistance | Vertex) -> bool:
+            if isinstance(other, CompareByDistance):
+                other = other.v
+            return _distance(self.v) < _distance(other)
+
+        def __gt__(self, other: CompareByDistance | Vertex) -> bool:
+            if isinstance(other, CompareByDistance):
+                other = other.v
+            return _distance(self.v) > _distance(other)
+
+        def __le__(self, other: CompareByDistance | Vertex) -> bool:
+            if isinstance(other, CompareByDistance):
+                other = other.v
+            return _distance(self.v) <= _distance(other)
+
+        def __ge__(self, other: CompareByDistance | Vertex) -> bool:
+            if isinstance(other, CompareByDistance):
+                other = other.v
+            return _distance(self.v) >= _distance(other)
+
+        def __str__(self):
+            return str(self.v)
+
+        def __repr__(self):
+            return repr(self.v)
+
+    q = [CompareByDistance(v) for v in graph]
+
+    while q:
+        heapq.heapify(q)
+        u = heapq.heappop(q).v
+
+        dsu = _distance(u)
+        for v in graph[u]:
+            new_dist = dsu + graph[u][v]
+            if new_dist < _distance(v):
+                ds[v] = new_dist, ds[u][1] + [v]
+
+    if goals is None:
+        goals = frozenset(v[:-1] for v in ds)
+    if isinstance(goals, tuple):
+        goals = frozenset([goals])
+
+    return {
+        goal: _reduce_dijkstra_route(min(
+            (
+                ds.get(v, DIJKSTRA_UNREACHABLE)
+                for direction in Direction
+                if (v := goal + (direction,)) in ds
+            ),
+            default=DIJKSTRA_UNREACHABLE,
+            key=lambda weight_route: weight_route[0],
+        ))
+        for goal in goals
+    }
+
+
+def dijkstra_solver(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot:
+    """A robot that solves the maze using dijkstra.
+
+    THIS IS A SECOND STEP ROBOT!
+
+    Returns:
+        Robot: The robot's brain.
+    """
+    forward_weight = 1  # basic unit
+    reverse_weight = 2  # reverse is twice as slow as full speed ahead
+    turn_weight = 1 + 2 + 1  # deceleration penalty + turn time + acceleration penalty
+
+    # Remember unknown cells so we can avoid them later
+    unknown_cells = {
+        (row, col)
+        for row, col, info in maze.iter_info()
+        if info.visited == 0
+    }
+
+    # Reset colors, route and orientation (but keep walls, we should be at the starting position)
+    maze.reset_info()
+    del maze.route
+    pos_row, pos_col, facing = yield Action.RESET
+
+    shortest_routes = _dijkstra(
+        maze,
+        (pos_row, pos_col, facing),
+        {
+            RelativeDirection.FRONT: forward_weight,
+            RelativeDirection.BACK: reverse_weight,
+            RelativeDirection.LEFT: turn_weight,
+            RelativeDirection.RIGHT: turn_weight,
+        },
+        without=unknown_cells,
+    )
+
+    for row, col, info in maze.iter_info():
+        info.weight = shortest_routes.get((row, col), (UNREACHABLE_WEIGHT, None))[0]
+        info.color = 'red' if (row, col) in unknown_cells else None
+
+    weight, best = min(  # there is at least 1 route
+        (shortest_routes.get(goal, (UNREACHABLE_WEIGHT, [])) for goal in goals),
+        key=lambda weight_route: (weight_route[0], len(weight_route[1])),
+    )
+
+    assert weight < UNREACHABLE_WEIGHT
+    assert best[0] == (pos_row, pos_col)
+    assert best[-1] in goals
+
+    # Do the actual fast route
+    yield from predetermined_path_robot(
+        maze,
+        goals,
+        path=best,
+        initial_heading=facing,
+    )
+
+
+def _two_step_robot(
+        maze: ExtendedMaze,
+        goals: set[tuple[int, int]],
+        *,
+        explorer: Algorithm = flood_fill_explore,
+        solver: Algorithm = dijkstra_solver,
+) -> Robot:
+    """Combines 2 robots: one for exploration and another for finding an optimal path.
+
+    Returns:
+        Robot: The robot's brain.
+    """
+    yield from explorer(maze, goals)
+    yield from solver(maze, goals)
+
+
+def basic_weighted_flood_fill(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot:
+    """A robot that solves the maze using a simple implementation of the flood-fill algorithm.
+
+    Returns:
+        Robot: The robot's brain.
+    """
+    return _two_step_robot(
+        maze,
+        goals,
+        explorer=partial(
+            flood_fill_explore,
+            weight=simple_flood_weight_with_strong_visit_bias,
+            minor_priority=identity,
+        ),
+    )

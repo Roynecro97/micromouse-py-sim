@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 
 from . import const, flood_fill, idle, random, wall_follower
 from .const import predetermined_robot
-from .flood_fill import simple_flood_fill
+from .flood_fill import simple_flood_fill, basic_weighted_flood_fill
 from .idle import idle_robot
 from .random import random_robot
 from .utils import Action, RobotState
