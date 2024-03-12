@@ -17,6 +17,11 @@ if TYPE_CHECKING:
     from ..maze import Maze
 
 
+def _append_unique[T](lst: list[T], val: T) -> None:
+    if not lst or lst[-1] != val:
+        lst.append(val)
+
+
 def predetermined_action_robot(
         maze: Maze,
         goals: set[tuple[int, int]],
@@ -33,7 +38,7 @@ def predetermined_action_robot(
 
     if isinstance(maze, ExtendedMaze):
         def _update_route():
-            maze.route.append((pos_row, pos_col))
+            _append_unique(maze.route, (pos_row, pos_col))
     else:
         def _update_route():
             pass
