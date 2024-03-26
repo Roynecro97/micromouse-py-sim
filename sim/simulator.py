@@ -57,7 +57,7 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
     def __init__(self, alg: Algorithm, maze: Maze, begin: tuple[int, int, Direction], end: Iterable[tuple[int, int]]):
         self._maze = ExtendedMaze.full_from_maze(maze)
         self._begin = begin
-        self._end = set(end)
+        self._end = frozenset(end)
 
         if self._begin[:-1] not in self._end and direction_to_wall(self._begin[-1]) in self._maze[self._begin[:-1]]:
             raise ValueError("robot starts facing a wall")
@@ -213,7 +213,7 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
         return self._begin
 
     @property
-    def end(self) -> set[tuple[int, int]]:  # TODO: maybe a readonly view
+    def end(self) -> frozenset[tuple[int, int]]:
         """The goal position(s) in the maze."""
         return self._end
 
@@ -238,12 +238,12 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
         connectivity = self._maze.connectivity
 
         # Normalize input to 2 sets
-        def _normalize(maybe_group: tuple[int, int] | Iterable[tuple[int, int]]) -> set[tuple[int, int]]:
+        def _normalize(maybe_group: tuple[int, int] | Iterable[tuple[int, int]]) -> frozenset[tuple[int, int]]:
             if not isinstance(maybe_group, tuple):
-                return set(maybe_group)
+                return frozenset(maybe_group)
             if len(maybe_group) != 2 or isinstance(maybe_group[0], tuple):
-                return set(maybe_group)  # type: ignore
-            return {maybe_group}  # type: ignore
+                return frozenset(maybe_group)  # type: ignore
+            return frozenset({maybe_group})  # type: ignore
 
         # Check connectivity
         return all(all(connectivity.connected(point_a, point_b) for point_b in _normalize(b)) for point_a in _normalize(a))

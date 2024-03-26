@@ -12,11 +12,13 @@ from . import utils  # for ENABLE_VICTORY_DANCE
 from .utils import Action, walls_to_directions
 
 if TYPE_CHECKING:
+    from collections.abc import Set
+
     from .utils import Robot
     from ..maze import Maze
 
 
-def random_robot(maze: Maze, goals: set[tuple[int, int]]) -> Robot:
+def random_robot(maze: Maze, goals: Set[tuple[int, int]]) -> Robot:
     """A robot with random movements.
 
     Returns:
@@ -24,11 +26,10 @@ def random_robot(maze: Maze, goals: set[tuple[int, int]]) -> Robot:
     """
     print(f"randomouse: starting in a {maze.height}x{maze.width} maze")
     print(f"randomouse: aiming for {goals}")
-    destination = set(goals)
     pos_row, pos_col, facing = yield Action.READY
     print(f"randomouse: starting at {(pos_row, pos_col)} facing {facing}")
 
-    while (pos_row, pos_col) not in destination:
+    while (pos_row, pos_col) not in goals:
         walls = maze[pos_row, pos_col]
         print(f"randomouse: at {(pos_row, pos_col)} facing {facing} with {walls}")
         new_direction = random.choice(walls_to_directions(walls))

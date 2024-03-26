@@ -7,6 +7,7 @@ import os
 import re
 import sys
 
+from collections.abc import Set
 from io import StringIO
 from typing import TypedDict, TYPE_CHECKING
 
@@ -84,7 +85,7 @@ def position(arg: str) -> tuple[int, int]:
     raise ValueError
 
 
-def position_set(arg: str) -> set[tuple[int, int]]:
+def position_set(arg: str) -> Set[tuple[int, int]]:
     """position type for argparse."""
     return {position(pos) for pos in arg.split(':')}
 
@@ -99,10 +100,10 @@ class Preset(TypedDict, total=True):
     file: str
     start_pos: tuple[int, int]
     start_direction: Direction
-    goals: set[tuple[int, int]]
+    goals: Set[tuple[int, int]]
 
 
-_PRESET_KEYS = set(Preset.__annotations__)
+_PRESET_KEYS = frozenset(Preset.__annotations__)
 
 
 class LoadPreset(argparse.Action):
@@ -148,7 +149,7 @@ class LoadPreset(argparse.Action):
             return tuple(obj)
 
         def _translate(d: dict[str, object], name: str) -> Preset:
-            keys = set(d)
+            keys = frozenset(d)
             if _PRESET_KEYS != keys:
                 if missing := _PRESET_KEYS - keys:
                     raise TypeError(f"in {name}: missing keys: {', '.join(missing)}")
@@ -165,7 +166,7 @@ class LoadPreset(argparse.Action):
             if isinstance(start_direction, str):
                 start_direction = Direction.from_str(start_direction)
 
-            if not isinstance(goals := d.get('goals'), list | set):
+            if not isinstance(goals := d.get('goals'), list | Set):
                 raise TypeError(f"invalid type for 'goals': {type(goals).__name__}")
             goals = {_translate_pos(g, name, f'goals[{i}]') for i, g in enumerate(goals)}
             return {'file': file, 'start_pos': start_pos, 'start_direction': start_direction, 'goals': goals}

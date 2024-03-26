@@ -11,11 +11,13 @@ from typing import TYPE_CHECKING
 from .utils import Action
 
 if TYPE_CHECKING:
+    from collections.abc import Set
+
     from .utils import Robot
     from ..maze import Maze
 
 
-def idle_robot(maze: Maze, goals: set[tuple[int, int]]) -> Robot:
+def idle_robot(maze: Maze, goals: Set[tuple[int, int]]) -> Robot:
     """A robot with random movements.
 
     Returns:

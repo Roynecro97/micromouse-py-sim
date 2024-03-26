@@ -94,12 +94,12 @@ class RobotState(NamedTuple):
 
 if TYPE_CHECKING:
     type Robot = Generator[Action, RobotState, None]
-    type Algorithm = Callable[[ExtendedMaze, set[tuple[int, int]]], Robot]
+    type Algorithm = Callable[[ExtendedMaze, Set[tuple[int, int]]], Robot]
 
     class SolverAlgorithm(Protocol):  # pylint: disable=missing-class-docstring,too-few-public-methods
         def __call__(
             self,
-            maze: ExtendedMaze, goals: set[tuple[int, int]],
+            maze: ExtendedMaze, goals: Set[tuple[int, int]],
             /, *,
             pos: RobotState,
             unknown_cells: Set[tuple[int, int]],
@@ -142,7 +142,7 @@ def _adjacent_cells_impl(maze: Maze, cells: Iterable[tuple[int, int]]) -> Iterab
             yield (row, col - 1)
 
 
-def adjacent_cells(maze: Maze, cells: Iterable[tuple[int, int]], without: set[tuple[int, int]] | None = None) -> set[tuple[int, int]]:
+def adjacent_cells(maze: Maze, cells: Iterable[tuple[int, int]], without: Set[tuple[int, int]] | None = None) -> set[tuple[int, int]]:
     """
     Returns a cell wil all cells that are adjacent (without diagonals) to a
     cell in ``cells`` and don't have a wall separating them from their relevant
@@ -151,7 +151,7 @@ def adjacent_cells(maze: Maze, cells: Iterable[tuple[int, int]], without: set[tu
     Args:
         maze (Maze): The maze.
         cells (Iterable[tuple[int, int]]): The cells to find adjacent cells of.
-        without (set[tuple[int, int]] | None, optional): Cells to exclude from the result. Defaults to None.
+        without (Set[tuple[int, int]] | None, optional): Cells to exclude from the result. Defaults to None.
 
     Returns:
         set[tuple[int, int]]: A cell with all relevant adjacent cells.

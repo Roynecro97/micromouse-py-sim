@@ -71,13 +71,13 @@ def simple_flood_weight_with_strong_visit_bias(**kwargs: Unpack[WeightArgs]) -> 
     return kwargs['marker'] + round(kwargs['info'].visited * 0.5)
 
 
-def weight_with_avoid_cells(weight: WeightCalc, avoid: set[tuple[int, int]], avoid_weight: float = UNREACHABLE_WEIGHT) -> WeightCalc:
+def weight_with_avoid_cells(weight: WeightCalc, avoid: Set[tuple[int, int]], avoid_weight: float = UNREACHABLE_WEIGHT) -> WeightCalc:
     """
     Create a weight generator that avoids certain cells by adding a penalty to their weight.
 
     Args:
         weight (WeightCalc): A weight function for cells that are not avoided.
-        avoid (set[tuple[int, int]]): The cells to avoid.
+        avoid (Set[tuple[int, int]]): The cells to avoid.
         avoid_weight (float, optional):
             The weight penalty for avoided cells, this is added to the regular weight.
             Defaults to UNREACHABLE_WEIGHT.
@@ -99,7 +99,7 @@ def weight_with_avoid_cells(weight: WeightCalc, avoid: set[tuple[int, int]], avo
 
 def calc_flood_fill(
         maze: ExtendedMaze,
-        goals: set[tuple[int, int]],
+        goals: Set[tuple[int, int]],
         weight: WeightCalc = simple_flood_weight,
         *,
         force: bool = False,
@@ -108,7 +108,7 @@ def calc_flood_fill(
 
     Args:
         maze (ExtendedMaze): The maze to flood.
-        goals (set[tuple[int, int]]): The goals to flood to.
+        goals (Set[tuple[int, int]]): The goals to flood to.
         robot_pos (tuple[int, int]): The starting position for the flood.
         robot_direction (Direction): The starting direction for the flood.
         weight (WeightCalc, optional): The weight function for the flood. Defaults to simple_flood_weight.
@@ -160,7 +160,7 @@ def _do_nothing() -> None:
 
 def single_flood_fill(  # pylint: disable=too-many-locals
         maze: ExtendedMaze,
-        goals: set[tuple[int, int]],
+        goals: Set[tuple[int, int]],
         *,
         weight: WeightCalc = simple_flood_weight,
         minor_priority: MinorPriority = shuffled,
@@ -236,7 +236,7 @@ def single_flood_fill(  # pylint: disable=too-many-locals
 
 def flood_fill_explore(
         maze: ExtendedMaze,
-        goals: set[tuple[int, int]],
+        goals: Set[tuple[int, int]],
         *,
         weight: WeightCalc = simple_flood_weight,
         minor_priority: MinorPriority = shuffled,
@@ -245,7 +245,7 @@ def flood_fill_explore(
 
     Args:
         maze (ExtendedMaze): The maze.
-        goals (set[tuple[int, int]]): The goal cells.
+        goals (Set[tuple[int, int]]): The goal cells.
         weight (WeightCalc, optional): The weight function. Defaults to simple_flood_weight.
         minor_priority (MinorPriority, optional):
             The last priority in selecting cells. Defaults to shuffled.
@@ -307,7 +307,7 @@ def flood_fill_robot(  # pylint: disable=too-many-arguments
     if final_minor_priority is None:
         final_minor_priority = minor_priority
 
-    def _flood_fill_robot_impl(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot:
+    def _flood_fill_robot_impl(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robot:
         """A robot that solves the maze using a simple implementation of the flood-fill algorithm.
 
         Returns:
@@ -342,7 +342,7 @@ def flood_fill_robot(  # pylint: disable=too-many-arguments
     return _flood_fill_robot_impl
 
 
-def simple_flood_fill(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot:
+def simple_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robot:
     """A robot that solves the maze using a simple implementation of the flood-fill algorithm.
 
     Returns:
@@ -353,7 +353,7 @@ def simple_flood_fill(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot:
 
 def dijkstra_solver(
         maze: ExtendedMaze,
-        goals: set[tuple[int, int]],
+        goals: Set[tuple[int, int]],
         *,
         pos: RobotState | None = None,
         unknown_cells: Set[tuple[int, int]] = frozenset(),
@@ -421,7 +421,7 @@ def dijkstra_solver(
 
 def _two_step_robot(
         maze: ExtendedMaze,
-        goals: set[tuple[int, int]],
+        goals: Set[tuple[int, int]],
         *,
         explorer: Algorithm = flood_fill_explore,
         solver: SolverAlgorithm = dijkstra_solver,
@@ -448,7 +448,7 @@ def _two_step_robot(
     yield from solver(maze, goals, pos=pos, unknown_cells=unknown_cells)
 
 
-def basic_weighted_flood_fill(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot:
+def basic_weighted_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robot:
     """A robot that solves the maze using a simple implementation of the flood-fill algorithm.
 
     Returns:
@@ -508,7 +508,7 @@ def _calc_unknown_groups(
 
 def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
         maze: ExtendedMaze,
-        goals: set[tuple[int, int]],
+        goals: Set[tuple[int, int]],
         *,
         percentage: float = 1.0,
         flood_weight: WeightCalc = simple_flood_weight,
@@ -520,7 +520,7 @@ def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-b
 
     Args:
         maze (ExtendedMaze): The maze.
-        goals (set[tuple[int, int]]): The final goals.
+        goals (Set[tuple[int, int]]): The final goals.
         percentage (float, optional): The percentage of the maze to explore before returning home. Defaults to 1.0.
         flood_weight (WeightCalc, optional): Exploration weight. Defaults to simple_flood_weight.
         minor_priority (MinorPriority, optional): Exploration minor priority. Defaults to identity.
@@ -635,7 +635,7 @@ def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-b
                 break  # recalculate route, a new wall was added
 
 
-def thourough_flood_fill(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot:
+def thourough_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robot:
     """A robot that solves the maze using an advanced implementation of the flood-fill algorithm and some dijkstra.
 
     Returns:

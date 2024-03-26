@@ -7,19 +7,22 @@ This robot will be unable to find certain goals (floaters).
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+
 from .utils import Action, direction_to_wall, turns_for_rel_direction
 from . import utils  # for ENABLE_VICTORY_DANCE
 from ..directions import RelativeDirection
 
 if TYPE_CHECKING:
+    from collections.abc import Set
     from typing import Literal
+
     from .utils import Algorithm, Robot
     from ..maze import Maze
 
 
 def _wall_follower_robot(
         maze: Maze,
-        goals: set[tuple[int, int]],
+        goals: Set[tuple[int, int]],
         *,
         follow: Literal[RelativeDirection.LEFT, RelativeDirection.RIGHT],
 ) -> Robot:
@@ -28,8 +31,6 @@ def _wall_follower_robot(
     Returns:
         Robot: The robot's brain.
     """
-    destination = set(goals)
-
     match follow:
         case RelativeDirection.LEFT | RelativeDirection.RIGHT: pass
         case RelativeDirection(): raise ValueError(f"invalid follow direction: {follow}")
@@ -38,7 +39,7 @@ def _wall_follower_robot(
 
     pos_row, pos_col, facing = yield Action.READY
 
-    while (pos_row, pos_col) not in destination:
+    while (pos_row, pos_col) not in goals:
         walls = maze[pos_row, pos_col]
         if direction_to_wall(turn := facing.turn(follow)) not in walls:
             rel = follow
@@ -72,7 +73,7 @@ def wall_follower_robot(follow: Literal[RelativeDirection.LEFT, RelativeDirectio
     Returns:
         Robot: The robot's brain.
     """
-    def _inner(maze: Maze, goals: set[tuple[int, int]]) -> Robot:
+    def _inner(maze: Maze, goals: Set[tuple[int, int]]) -> Robot:
         return _wall_follower_robot(maze, goals, follow=follow)
 
     return _inner

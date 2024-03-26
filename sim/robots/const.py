@@ -13,7 +13,7 @@ from ..directions import Direction
 from ..maze import ExtendedMaze
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Set
     from .utils import Algorithm, Robot
     from ..maze import Maze
 
@@ -25,7 +25,7 @@ def _append_unique[T](lst: list[T], val: T) -> None:
 
 def predetermined_action_robot(
         maze: Maze,
-        goals: set[tuple[int, int]],
+        goals: Set[tuple[int, int]],
         *,
         actions: Iterable[Action],
 ) -> Robot:
@@ -65,7 +65,7 @@ def _iterate_in_pairs[T](items: Iterable[T]) -> Iterable[tuple[T, T]]:
 
 def predetermined_directions_robot(
         maze: Maze,
-        goals: set[tuple[int, int]],
+        goals: Set[tuple[int, int]],
         *,
         route: Iterable[Direction],
 ) -> Robot:
@@ -85,7 +85,7 @@ def predetermined_directions_robot(
 
 def predetermined_path_robot(
         maze: Maze,
-        goals: set[tuple[int, int]],
+        goals: Set[tuple[int, int]],
         *,
         path: Iterable[tuple[int, int]],
         initial_heading: Direction,
