@@ -12,7 +12,7 @@ from functools import partial, reduce
 from operator import or_
 from typing import Protocol, TypedDict, TYPE_CHECKING
 
-from .utils import Action, adjacent_cells, cell_to_direction, direction_to_cell, shuffled, walls_to_directions
+from .utils import Action, adjacent_cells, direction_to_cell, shuffled, walls_to_directions
 from .utils import build_weighted_graph, dijkstra, identity, mark_unreachable_groups
 from .const import predetermined_path_robot
 from ..directions import Direction, RelativeDirection
@@ -465,11 +465,6 @@ def basic_weighted_flood_fill(maze: ExtendedMaze, goals: set[tuple[int, int]]) -
     )
 
 
-def _last_direction(route: list[tuple[int, int]]) -> Direction:
-    src, dst = route[-2:]
-    return cell_to_direction(src, dst)
-
-
 DEFAULT_DIJKSTRA_WEIGHTS: dict[RelativeDirection, float] = {
     RelativeDirection.FRONT: 1,
     RelativeDirection.BACK: 2,
@@ -502,7 +497,6 @@ def _calc_unknown_groups(
             if maze.extra_info[adjacent].visited == 0:
                 groups.union((row, col), adjacent)
                 called_union = True
-        # info.color = unknown_color if called_union else None
         if called_union:
             if info.color is None and unknown_color is not None:
                 info.color = unknown_color
@@ -539,14 +533,6 @@ def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-b
 
     unknown_color = 'blue'
 
-    # def _inv_dijkstra() -> dict[tuple[int, int], float]:
-    #     inv_routes = dijkstra(
-    #         build_weighted_graph(maze, DEFAULT_DIJKSTRA_WEIGHTS, start=pos),
-    #         dest,
-    #         # _last_direction(routes[dest][1]),
-    #     )
-    #     return {v: w for v, (w, _) in inv_routes.items()}
-
     # First, find the goal
     # We cannot use ``yield from`` because we need the final reply from the yield
     print(f"flood hunter: looking for {goals=}")
@@ -581,7 +567,6 @@ def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-b
 
         potential_routes = {
             # The start gets 'inf' so that is is chosen last (reaching the start ends the exploration)
-            # FIXME: check why routes can be 0 and maybe invert this and the min() later
             best[1]: (best[0] / len(group)) if start not in group else math.inf
             for group in unknown
             if math.isfinite((best := max((routes.get(cell, (math.inf, []))[0], cell) for cell in group))[0])
@@ -598,19 +583,6 @@ def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-b
         maze.extra_info[dest].color = 'green'
         print(f"flood hunter: hunting {dest}")
 
-        # inverse_weights = _inv_dijkstra()
-        # def floodijkstra_weight(**kwargs: Unpack[WeightArgs]):
-        #     """Calculate flood-fill weights using the dijkstra results."""
-        #     if kwargs['marker'] == 0:
-        #         return 0
-        #     return inverse_weights[kwargs['cell']]
-
-        # flood_bot = single_flood_fill(
-        #     maze,
-        #     {dest},
-        #     weight=floodijkstra_weight,
-        #     minor_priority=minor_priority,
-        # )
         flood_bot = single_flood_fill(
             maze,
             {dest},
@@ -620,10 +592,6 @@ def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-b
         assert next(flood_bot, None) is Action.READY
         while True:
             # print(maze.render_extra(goals=goals, pos=pos))
-            # inverse_weights = _inv_dijkstra()
-            # if math.isinf(inverse_weights[pos[:-1]]):
-            #     print(f"flood hunter: dest is unreachable - {inverse_weights=}")
-            #     break
             if math.isinf(maze.extra_info[pos[:-1]].weight):
                 print("flood hunter: dest is unreachable")
                 break
@@ -643,7 +611,6 @@ def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-b
         routes = dijkstra(
             build_weighted_graph(maze, DEFAULT_DIJKSTRA_WEIGHTS, start=pos),
             pos[:-1],
-            # pos[-1],
             goals={start},
         )
         print(f"flood hunter: @{pos} -> {routes[start][1]}")
@@ -666,12 +633,6 @@ def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-b
                 print("flood hunter: encountered a wall while going home")
                 maze.mark_changed()  # restore mark
                 break  # recalculate route, a new wall was added
-        # yield from predetermined_path_robot(
-        #     maze,
-        #     {start},
-        #     path=routes[start][1],
-        #     initial_heading=pos[-1],
-        # )  # FIXME: skip READY; FIXME: recalculate route if maze.changed()
 
 
 def thourough_flood_fill(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot:
