@@ -6,7 +6,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from sim.maze import Direction, ExtendedMaze, Maze
+from sim.directions import Direction
+from sim.maze import ExtendedMaze, Maze
 from sim.robots import Action, RobotState
 from sim.robots.const import predetermined_action_robot, predetermined_directions_robot, predetermined_path_robot, predetermined_robot
 

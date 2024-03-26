@@ -9,7 +9,8 @@ from functools import partial
 from itertools import chain
 from typing import overload, TypedDict, TYPE_CHECKING, Unpack
 from .utils import Action, abs_turn_to_actions, cell_to_direction
-from ..maze import Direction, ExtendedMaze
+from ..directions import Direction
+from ..maze import ExtendedMaze
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

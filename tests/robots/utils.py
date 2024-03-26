@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sim.maze import Direction
+from sim.directions import Direction
 from sim.robots import Action, RobotState
 
 

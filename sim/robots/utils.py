@@ -12,7 +12,8 @@ import random
 from enum import auto, Enum
 from typing import NamedTuple, overload, TYPE_CHECKING
 
-from ..maze import Direction, ExtendedMaze, Maze, RelativeDirection, Walls, PRIMARY_DIRECTIONS
+from ..directions import Direction, RelativeDirection, PRIMARY_DIRECTIONS
+from ..maze import Walls
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Generator, Set

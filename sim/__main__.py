@@ -10,7 +10,8 @@ import sys
 from io import StringIO
 from typing import TypedDict, TYPE_CHECKING
 
-from .maze import Direction, Maze
+from .directions import Direction
+from .maze import Maze
 from .gui import GUIRenderer  # TODO: change this to use the entrypoints syntax
 from .robots import idle_robot
 from .robots.utils import walls_to_directions

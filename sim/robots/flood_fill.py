@@ -15,7 +15,8 @@ from typing import Protocol, TypedDict, TYPE_CHECKING
 from .utils import Action, adjacent_cells, cell_to_direction, direction_to_cell, shuffled, walls_to_directions
 from .utils import build_weighted_graph, dijkstra, identity, mark_unreachable_groups
 from .const import predetermined_path_robot
-from ..maze import Direction, RelativeDirection, Walls
+from ..directions import Direction, RelativeDirection
+from ..maze import Walls
 from ..unionfind import UnionFind
 
 if TYPE_CHECKING:

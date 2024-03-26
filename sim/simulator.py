@@ -9,7 +9,8 @@ from contextlib import contextmanager
 from enum import auto, Enum
 from typing import TYPE_CHECKING
 
-from .maze import Direction, ExtendedMaze, Maze, RelativeDirection
+from .directions import Direction, RelativeDirection
+from .maze import ExtendedMaze, Maze
 from .robots import Action, RobotState
 from .robots.utils import build_weighted_graph, dijkstra, direction_to_wall
 

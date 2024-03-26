@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from .utils import Action, direction_to_wall, turns_for_rel_direction
 from . import utils  # for ENABLE_VICTORY_DANCE
-from ..maze import RelativeDirection
+from ..directions import RelativeDirection
 
 if TYPE_CHECKING:
     from typing import Literal
