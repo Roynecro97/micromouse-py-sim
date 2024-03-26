@@ -2,13 +2,17 @@
 """
 from __future__ import annotations
 
+import sys
+import time
+
+from contextlib import contextmanager
 from enum import auto, Enum
 from typing import TYPE_CHECKING
 
-from .maze import Direction, ExtendedMaze, Maze, Walls
+from .directions import Direction, RelativeDirection
+from .maze import ExtendedMaze, Maze
 from .robots import Action, RobotState
-from .robots.utils import direction_to_wall
-from .unionfind import UnionFind
+from .robots.utils import build_weighted_graph, dijkstra, direction_to_wall
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -25,6 +29,24 @@ class SimulationStatus(Enum):
     IN_PROGRESS_FOUND_DEST = auto()
     FINISHED = auto()
     ERROR = auto()
+
+
+@contextmanager
+def timed(title: str = ""):
+    """A contextmanager for measuring time (in seconds)."""
+    t0 = time.perf_counter()
+    try:
+        yield
+    finally:
+        t1 = time.perf_counter()
+        elapsed = t1 - t0
+        if exc := sys.exception():
+            result = 'failed'
+            tail = f" ({type(exc).__name__}: {exc!s})"
+        else:
+            result = 'completed'
+            tail = ""
+        print(f"{title}{title and ' '}{result} in {elapsed:0.6f}s{tail}")
 
 
 class Simulator:  # pylint: disable=too-many-instance-attributes
@@ -44,6 +66,23 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
         if not self.connected(self._begin[:-1], self._end):
             raise ValueError("the starting position (begin) is not connected to all goal positions (end)")
 
+        self._maze.route = min(
+            dijkstra(
+                build_weighted_graph(
+                    self._maze,
+                    {
+                        RelativeDirection.FRONT: 1,
+                        RelativeDirection.BACK: 2,
+                        RelativeDirection.LEFT: 4,
+                        RelativeDirection.RIGHT: 4,
+                    },
+                    start=self._begin,
+                ),
+                self._begin[:-1],
+                goals=self._end,
+            ).values(),
+        )[1]
+
         self.restart(alg)
 
     def restart(self, alg: Algorithm):
@@ -58,7 +97,8 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
 
         self._status = SimulationStatus.ERROR
         try:
-            state = next(self._robot)
+            with timed("sim: robot init"):
+                state = next(self._robot)
         except StopIteration as stop:
             raise RuntimeError("robot failed to start - stopped before yielding any action") from stop
         except Exception as err:
@@ -87,7 +127,8 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
         print(f"sim: robot is at {(row, col)} facing {facing}")
 
         try:
-            action = self._robot.send(RobotState(*self._robot_pos))
+            with timed("sim: robot step"):
+                action = self._robot.send(RobotState(*self._robot_pos))
         except StopIteration:
             self._status = SimulationStatus.FINISHED if (row, col) in self._end else SimulationStatus.ERROR
             print(f"sim: robot stopped, status is {self.status}")
@@ -194,15 +235,7 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
     def connected(self, a: tuple[int, int] | Iterable[tuple[int, int]], b: tuple[int, int] | Iterable[tuple[int, int]]) -> bool:
         """Check if two cells (or cell groups) are connected in the maze."""
         # Calculate connectivity
-        connectivity: UnionFind[tuple[int, int]] = UnionFind()
-        for row in range(self._maze.height):
-            for col in range(self._maze.width):
-                for missing in ~self._maze[row, col]:
-                    match missing:
-                        case Walls.NORTH: connectivity.union((row, col), (row - 1, col))
-                        case Walls.EAST: connectivity.union((row, col), (row, col + 1))
-                        case Walls.SOUTH: connectivity.union((row, col), (row + 1, col))
-                        case Walls.WEST: connectivity.union((row, col), (row, col - 1))
+        connectivity = self._maze.connectivity
 
         # Normalize input to 2 sets
         def _normalize(maybe_group: tuple[int, int] | Iterable[tuple[int, int]]) -> set[tuple[int, int]]:

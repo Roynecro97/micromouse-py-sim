@@ -7,7 +7,7 @@ from typing import Callable
 
 import pytest
 
-from sim.maze import Direction, RelativeDirection
+from sim.directions import Direction, RelativeDirection
 
 
 __RELATIVE_DIRECTION_PAIRS: set[tuple[RelativeDirection, RelativeDirection]] = {

@@ -11,15 +11,18 @@ import os
 import re
 
 from dataclasses import dataclass
-from enum import auto, Enum, Flag, IntEnum
+from enum import Flag
 from functools import reduce
 from operator import or_
-from typing import cast, overload, TYPE_CHECKING
+from typing import cast, TYPE_CHECKING
 
 import numpy as np
 
+from .directions import Direction
+from .unionfind import UnionFind
+
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    from collections.abc import Iterable, Iterator, Set
     from typing import BinaryIO, Callable, Literal, Self, TextIO, TypeAlias
 
     import numpy.typing as npt
@@ -31,162 +34,6 @@ else:
 type MazeSize = tuple[int, int]
 
 AnyPath: TypeAlias = os.PathLike | str | bytes
-
-
-class RelativeDirection(Enum):
-    """Relative directions."""
-    FRONT = auto()
-    BACK = auto()
-    LEFT = auto()
-    RIGHT = auto()
-
-    @overload
-    def invert(self: Literal[FRONT]) -> Literal[BACK]: ...
-    @overload
-    def invert(self: Literal[BACK]) -> Literal[FRONT]: ...
-    @overload
-    def invert(self: Literal[LEFT]) -> Literal[RIGHT]: ...
-    @overload
-    def invert(self: Literal[RIGHT]) -> Literal[LEFT]: ...
-    @overload
-    def invert(self) -> RelativeDirection: ...
-
-    def invert(self) -> RelativeDirection:
-        """Invert the direction (left <-> right; front <-> back)"""
-        match self:
-            case RelativeDirection.FRONT: return RelativeDirection.BACK
-            case RelativeDirection.BACK: return RelativeDirection.FRONT
-            case RelativeDirection.LEFT: return RelativeDirection.RIGHT
-            case RelativeDirection.RIGHT: return RelativeDirection.LEFT
-
-
-class Direction(IntEnum):
-    """Bit masks for the directions."""
-    NORTH = 0x1
-    EAST = 0x2
-    SOUTH = 0x4
-    WEST = 0x8
-    NORTH_EAST = NORTH | EAST
-    NORTH_WEST = NORTH | WEST
-    SOUTH_EAST = SOUTH | EAST
-    SOUTH_WEST = SOUTH | WEST
-
-    def turn_left(self) -> Direction:  # pylint: disable=too-many-return-statements
-        """Return the direction that is the result of turning left (90 degrees counter-clockwise)."""
-        match self:
-            case Direction.NORTH: return Direction.WEST
-            case Direction.EAST: return Direction.NORTH
-            case Direction.SOUTH: return Direction.EAST
-            case Direction.WEST: return Direction.SOUTH
-            case Direction.NORTH_EAST: return Direction.NORTH_WEST
-            case Direction.NORTH_WEST: return Direction.SOUTH_WEST
-            case Direction.SOUTH_EAST: return Direction.NORTH_EAST
-            case Direction.SOUTH_WEST: return Direction.SOUTH_EAST
-
-    def turn_right(self) -> Direction:  # pylint: disable=too-many-return-statements
-        """Return the direction that is the result of turning right (90 degrees clockwise)."""
-        match self:
-            case Direction.NORTH: return Direction.EAST
-            case Direction.EAST: return Direction.SOUTH
-            case Direction.SOUTH: return Direction.WEST
-            case Direction.WEST: return Direction.NORTH
-            case Direction.NORTH_EAST: return Direction.SOUTH_EAST
-            case Direction.NORTH_WEST: return Direction.NORTH_EAST
-            case Direction.SOUTH_EAST: return Direction.SOUTH_WEST
-            case Direction.SOUTH_WEST: return Direction.NORTH_WEST
-
-    def turn_back(self) -> Direction:  # pylint: disable=too-many-return-statements
-        """Return the direction that is the result of turning back (180 degrees)."""
-        match self:
-            case Direction.NORTH: return Direction.SOUTH
-            case Direction.EAST: return Direction.WEST
-            case Direction.SOUTH: return Direction.NORTH
-            case Direction.WEST: return Direction.EAST
-            case Direction.NORTH_EAST: return Direction.SOUTH_WEST
-            case Direction.NORTH_WEST: return Direction.SOUTH_EAST
-            case Direction.SOUTH_EAST: return Direction.NORTH_WEST
-            case Direction.SOUTH_WEST: return Direction.NORTH_EAST
-
-    def half_turn_left(self) -> Direction:  # pylint: disable=too-many-return-statements
-        """Return the direction that is the result of turning left (90 degrees counter-clockwise)."""
-        match self:
-            case Direction.NORTH: return Direction.NORTH_WEST
-            case Direction.EAST: return Direction.NORTH_EAST
-            case Direction.SOUTH: return Direction.SOUTH_EAST
-            case Direction.WEST: return Direction.SOUTH_WEST
-            case Direction.NORTH_EAST: return Direction.NORTH
-            case Direction.NORTH_WEST: return Direction.WEST
-            case Direction.SOUTH_EAST: return Direction.EAST
-            case Direction.SOUTH_WEST: return Direction.SOUTH
-
-    def half_turn_right(self) -> Direction:  # pylint: disable=too-many-return-statements
-        """Return the direction that is the result of turning right (90 degrees clockwise)."""
-        match self:
-            case Direction.NORTH: return Direction.NORTH_EAST
-            case Direction.EAST: return Direction.SOUTH_EAST
-            case Direction.SOUTH: return Direction.SOUTH_WEST
-            case Direction.WEST: return Direction.NORTH_WEST
-            case Direction.NORTH_EAST: return Direction.EAST
-            case Direction.NORTH_WEST: return Direction.NORTH
-            case Direction.SOUTH_EAST: return Direction.SOUTH
-            case Direction.SOUTH_WEST: return Direction.WEST
-
-    def turn(self, rel: RelativeDirection) -> Direction:
-        """Return the direction that is the result of turning in the provided relative direction."""
-        match rel:
-            case RelativeDirection.FRONT: return self
-            case RelativeDirection.BACK: return self.turn_back()
-            case RelativeDirection.LEFT: return self.turn_left()
-            case RelativeDirection.RIGHT: return self.turn_right()
-
-    def half_turn(self, rel: RelativeDirection) -> Direction:
-        """Return the direction that is the result of half a turn in the provided relative direction."""
-        match rel:
-            case RelativeDirection.FRONT: return self
-            case RelativeDirection.BACK: raise ValueError("cannot half turn back")
-            case RelativeDirection.LEFT: return self.half_turn_left()
-            case RelativeDirection.RIGHT: return self.half_turn_right()
-
-    def to_degrees(self) -> Literal[0, 45, 90, 135, 180, 225, 270, 315]:  # pylint: disable=too-many-return-statements
-        """Get the rotation degrees. EAST is 0 deg, degrees increase clockwise."""
-        match self:
-            case Direction.EAST: return 0
-            case Direction.SOUTH_EAST: return 45
-            case Direction.SOUTH: return 90
-            case Direction.SOUTH_WEST: return 135
-            case Direction.WEST: return 180
-            case Direction.NORTH_WEST: return 225
-            case Direction.NORTH: return 270
-            case Direction.NORTH_EAST: return 315
-
-    def to_radians(self) -> float:
-        """Get the rotation radians. EAST is 0, angles increase clockwise."""
-        return math.radians(self.to_degrees())
-
-    @staticmethod
-    def from_str(direction: str) -> Direction:  # pylint: disable=too-many-return-statements
-        """Create from a direction name."""
-        match direction.strip().casefold():
-            case 'north' | 'n':
-                return Direction.NORTH
-            case 'east' | 'e':
-                return Direction.EAST
-            case 'south' | 's':
-                return Direction.SOUTH
-            case 'west' | 'w':
-                return Direction.WEST
-            case 'north_east' | 'north east' | 'ne':
-                return Direction.NORTH_EAST
-            case 'north_west' | 'north west' | 'nw':
-                return Direction.NORTH_WEST
-            case 'south_east' | 'south east' | 'se':
-                return Direction.SOUTH_EAST
-            case 'south_west' | 'south west' | 'sw':
-                return Direction.SOUTH_WEST
-        raise ValueError(f"{direction!r} is not a valid Direction")
-
-    def __str__(self):
-        return self.name
 
 
 class Walls(Flag):
@@ -682,7 +529,7 @@ class Maze:
             raise IndexError("TODO: pretty string")
         return Walls(val)
 
-    def __setitem__(self, idx: tuple[int, int], value: Walls):
+    def __setitem__(self, idx: tuple[int, int], value: Walls) -> None:
         if not isinstance(idx, tuple) or len(idx) != 2 or not all(isinstance(i, int) for i in idx):
             raise TypeError(f"expected 2 ints: (row, col), got {idx!r}")
         row, col = idx
@@ -705,12 +552,12 @@ class Maze:
         self._add_neighbor_walls(row, col, value)
         self._remove_neighbor_walls(row, col, ~value)
 
-    def add_walls(self, row: int, col: int, walls: Walls):
+    def add_walls(self, row: int, col: int, walls: Walls) -> None:
         """Add walls to the maze."""
         self._cells[self._index(row, col)] |= walls.value
         self._add_neighbor_walls(row, col, walls)
 
-    def _add_neighbor_walls(self, row: int, col: int, walls: Walls):
+    def _add_neighbor_walls(self, row: int, col: int, walls: Walls) -> None:
         """Add walls to the neighboring cells in the maze."""
         for added in walls:
             match added:
@@ -723,12 +570,12 @@ class Maze:
                 case Walls.WEST if col > 0:
                     self._cells[self._index(row, col - 1)] |= Walls.EAST.value
 
-    def remove_walls(self, row: int, col: int, walls: Walls):
+    def remove_walls(self, row: int, col: int, walls: Walls) -> None:
         """Remove walls from the maze."""
         self._cells[self._index(row, col)] &= (~walls).value
         self._remove_neighbor_walls(row, col, walls)
 
-    def _remove_neighbor_walls(self, row: int, col: int, walls: Walls):
+    def _remove_neighbor_walls(self, row: int, col: int, walls: Walls) -> None:
         """Remove walls from the neighboring cells in the maze."""
         for removed in walls:
             match removed:
@@ -825,7 +672,7 @@ class Maze:
         """Render the maze as text"""
         return '\n'.join(''.join(row) for row in self.render_screen(charset, cell_width, cell_height, force_corners)) + '\n'
 
-    def _validate(self):
+    def _validate(self) -> None:
         """Raises an exception if the maze is not enclosed by walls or if 2 adjacent cells disagree on their shared wall"""
         for idx, cell in enumerate(self._cells):
             walls = Walls(cell)
@@ -863,7 +710,7 @@ class ExtraCellInfo(NumpyCheat):
     color: tuple[int, int, int] | str | None = None  # Maybe a better type here
     visited: int = 0
 
-    def visit_cell(self):
+    def visit_cell(self) -> None:
         """Increase the visit counter for the cell."""
         self.visited += 1
 
@@ -880,11 +727,14 @@ class ExtendedMaze(Maze):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
+        self._connectivity: UnionFind[tuple[int, int]] | None = None
         self._route: Route = []
         self._extra_info: npt.NDArray[ExtraCellInfo] = np.empty(self.size, dtype=ExtraCellInfo)
+        self._curr_gen = 0
+        self._prev_gen = self._curr_gen - 1
         self.reset_info()
 
-    def reset_info(self):
+    def reset_info(self) -> None:
         """Reset the extra info held in the maze."""
         for row in range(self.height):
             for col in range(self.width):
@@ -896,7 +746,7 @@ class ExtendedMaze(Maze):
         return self._extra_info
 
     @extra_info.deleter
-    def extra_info(self):
+    def extra_info(self) -> None:
         """Reset the extra info."""
         self.reset_info()
 
@@ -924,15 +774,140 @@ class ExtendedMaze(Maze):
 
     @property
     def route(self) -> Route:
-        """Get the route for the maze, in (row, col) pairs."""
+        """The route for the maze, in (row, col) pairs."""
         return self._route
 
     @route.setter
-    def route(self, value: RouteLike):
+    def route(self, value: RouteLike) -> None:
         """Set the route for the maze, in (row, col) pairs."""
         self._route = list(value or ())
 
     @route.deleter
-    def route(self):
+    def route(self) -> None:
         """Reset the current route."""
         self._route = []
+
+    def explored_cells_count(self) -> int:
+        """Calculate the number of cells that were visited.
+
+        Returns:
+            int: The number of cells that were visited.
+        """
+        return sum(info.visited > 0 for _, _, info in self.iter_info())
+
+    def explored_cells_percentage(self) -> float:
+        """Calculate the percentage of cells that were visited.
+
+        Returns:
+            float: The percentage of cells that were visited.
+        """
+        return self.explored_cells_count() / self.cell_size
+
+    @property
+    def connectivity(self) -> UnionFind[tuple[int, int]]:
+        """Calculate connected groups in the maze.
+
+        Returns:
+            UnionFind[tuple[int, int]]: All connected groups of cells.
+        """
+        if self._connectivity is None:
+            self._connectivity = UnionFind()
+            for row, col, walls in self:
+                for missing in ~walls:
+                    match missing:
+                        case Walls.NORTH:
+                            self._connectivity.union((row, col), (row - 1, col))
+                        case Walls.EAST:
+                            self._connectivity.union((row, col), (row, col + 1))
+                        case Walls.SOUTH:
+                            self._connectivity.union((row, col), (row + 1, col))
+                        case Walls.WEST:
+                            self._connectivity.union((row, col), (row, col - 1))
+        return self._connectivity
+
+    @connectivity.deleter
+    def connectivity(self) -> None:
+        """Clear connectivity caching."""
+        self._connectivity = None
+
+    def __setitem__(self, idx: tuple[int, int], value: Walls) -> None:
+        old_val = self[idx]
+        try:
+            return super().__setitem__(idx, value)
+        finally:
+            if old_val != self[idx]:
+                self.mark_changed()
+
+    def add_walls(self, row: int, col: int, walls: Walls) -> None:
+        old_val = self[row, col]
+        try:
+            return super().add_walls(row, col, walls)
+        finally:
+            if old_val != self[row, col]:
+                self.mark_changed()
+
+    def remove_walls(self, row: int, col: int, walls: Walls) -> None:
+        old_val = self[row, col]
+        try:
+            return super().remove_walls(row, col, walls)
+        finally:
+            if old_val != self[row, col]:
+                self.mark_changed()
+
+    def mark_changed(self) -> None:
+        """Mark that the maze has changed, regardless of wall changes."""
+        del self.connectivity
+        self._curr_gen = self._prev_gen + 1
+
+    def changed(self) -> bool:
+        """Check whether the maze has changed (added/removed walls) since the last call.
+
+        Returns:
+            bool: True if there was a change since the last call, otherwise False.
+        """
+        prev, self._prev_gen = self._prev_gen, self._curr_gen
+        return prev != self._curr_gen
+
+    __ROBOT_MARKERS: dict[Direction, str] = {
+        Direction.NORTH: '^',
+        Direction.EAST: '>',
+        Direction.SOUTH: 'v',
+        Direction.WEST: '<',
+    }
+
+    def render_extra(
+            self,
+            *,
+            charset: Charset = ascii_charset,
+            pos: tuple[int, int, Direction] | None = None,
+            goals: Set[tuple[int, int]] = frozenset(),
+            weights: bool = True,
+    ) -> str:
+        """Render the maze with extra information"""
+        cell_width = cell_height = 1
+        if weights:
+            cell_width = max(len(str(info.weight)) if info.weight else 1 for _, _, info in self.iter_info())
+            cell_height = 2
+        screen = self.render_screen(
+            cell_width=2 + cell_width,
+            cell_height=cell_height,
+            charset=charset,
+        )
+
+        def screen_pos(row: int, col: int, /) -> tuple[int, int]:
+            return (row + 1) * (cell_height + 1) - 1, col * (cell_width + 3) + 1 + ((cell_width + 1) // 2)
+
+        if pos:
+            screen[screen_pos(*pos[:2])] = self.__ROBOT_MARKERS.get(pos[2], 'S')
+        for goal in goals - {(pos or ())[:2]}:
+            screen[screen_pos(*goal)] = '@'
+
+        def write_weight(screen_row: int, screen_left_col: int, weight: float | None, /) -> None:
+            weight_str = f"{'' if weight is None else weight:>{cell_width}}"
+            for i in range(cell_width):
+                screen[screen_row, screen_left_col + i] = weight_str[i]
+
+        if weights:
+            for cell_row, cell_col, info in self.iter_info():
+                write_weight(cell_row * (cell_height + 1) + 1, cell_col * (cell_width + 3) + 2, info.weight)
+        return '\n'.join(''.join(row) for row in screen)
