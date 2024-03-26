@@ -512,51 +512,6 @@ def _calc_unknown_groups(
     return groups, reduce(or_, groups.iter_sets(), set())
 
 
-def _render_maze(
-        maze: ExtendedMaze,
-        *,
-        pos: tuple[int, int, Direction] | None = None,
-        goals: Set[tuple[int, int]] = frozenset(),
-        weights: bool = True,
-) -> str:
-    import numpy as np
-    cell_width = cell_height = 1
-    if weights:
-        cell_width = max(len(str(info.weight)) if info.weight else 1 for _, _, info in maze.iter_info())
-        cell_height = 2
-    screen = maze.render_screen(
-        cell_width=2 + cell_width,
-        cell_height=cell_height,
-    )
-
-    def screen_pos(row: int, col: int, /) -> tuple[int, int]:
-        return (row + 1) * (cell_height + 1) - 1, col * (cell_width + 3) + 1 + ((cell_width + 1) // 2)
-
-    if pos:
-        match pos[2]:
-            case Direction.NORTH:
-                robot_mark = '^'
-            case Direction.EAST:
-                robot_mark = '>'
-            case Direction.SOUTH:
-                robot_mark = 'v'
-            case Direction.WEST:
-                robot_mark = '<'
-            case _:
-                robot_mark = 'S'
-        screen[screen_pos(*pos[:2])] = robot_mark
-    for goal in goals:
-        screen[screen_pos(*goal)] = '@'
-
-    if weights:
-        for cell_row, cell_col, info in maze.iter_info():
-            screen_left_col = cell_col * (cell_width + 3) + 2
-            weight_str = f"{' ' if info.weight is None else info.weight:>{cell_width}}"
-            for i in range(cell_width):
-                screen[cell_row * (cell_height + 1) + 1, screen_left_col + i] = weight_str[i]
-    return '\n'.join(''.join(row) for row in screen)
-
-
 def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
         maze: ExtendedMaze,
         goals: set[tuple[int, int]],
@@ -664,7 +619,7 @@ def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-b
         )
         assert next(flood_bot, None) is Action.READY
         while True:
-            # print(_render_maze(maze, goals=goals, pos=pos))
+            # print(maze.render_extra(goals=goals, pos=pos))
             # inverse_weights = _inv_dijkstra()
             # if math.isinf(inverse_weights[pos[:-1]]):
             #     print(f"flood hunter: dest is unreachable - {inverse_weights=}")

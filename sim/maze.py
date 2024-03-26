@@ -18,10 +18,11 @@ from typing import cast, TYPE_CHECKING
 
 import numpy as np
 
+from .directions import Direction
 from .unionfind import UnionFind
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    from collections.abc import Iterable, Iterator, Set
     from typing import BinaryIO, Callable, Literal, Self, TextIO, TypeAlias
 
     import numpy.typing as npt
@@ -866,3 +867,47 @@ class ExtendedMaze(Maze):
         """
         prev, self._prev_gen = self._prev_gen, self._curr_gen
         return prev != self._curr_gen
+
+    __ROBOT_MARKERS: dict[Direction, str] = {
+        Direction.NORTH: '^',
+        Direction.EAST: '>',
+        Direction.SOUTH: 'v',
+        Direction.WEST: '<',
+    }
+
+    def render_extra(
+            self,
+            *,
+            charset: Charset = ascii_charset,
+            pos: tuple[int, int, Direction] | None = None,
+            goals: Set[tuple[int, int]] = frozenset(),
+            weights: bool = True,
+    ) -> str:
+        """Render the maze with extra information"""
+        cell_width = cell_height = 1
+        if weights:
+            cell_width = max(len(str(info.weight)) if info.weight else 1 for _, _, info in self.iter_info())
+            cell_height = 2
+        screen = self.render_screen(
+            cell_width=2 + cell_width,
+            cell_height=cell_height,
+            charset=charset,
+        )
+
+        def screen_pos(row: int, col: int, /) -> tuple[int, int]:
+            return (row + 1) * (cell_height + 1) - 1, col * (cell_width + 3) + 1 + ((cell_width + 1) // 2)
+
+        if pos:
+            screen[screen_pos(*pos[:2])] = self.__ROBOT_MARKERS.get(pos[2], 'S')
+        for goal in goals - {(pos or ())[:2]}:
+            screen[screen_pos(*goal)] = '@'
+
+        def write_weight(screen_row: int, screen_left_col: int, weight: float | None, /) -> None:
+            weight_str = f"{'' if weight is None else weight:>{cell_width}}"
+            for i in range(cell_width):
+                screen[screen_row, screen_left_col + i] = weight_str[i]
+
+        if weights:
+            for cell_row, cell_col, info in self.iter_info():
+                write_weight(cell_row * (cell_height + 1) + 1, cell_col * (cell_width + 3) + 2, info.weight)
+        return '\n'.join(''.join(row) for row in screen)
