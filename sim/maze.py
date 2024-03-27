@@ -813,16 +813,17 @@ class ExtendedMaze(Maze):
         if self._connectivity is None:
             self._connectivity = UnionFind()
             for row, col, walls in self:
+                self._connectivity.find(cell := (row, col))
                 for missing in ~walls:
                     match missing:
                         case Walls.NORTH:
-                            self._connectivity.union((row, col), (row - 1, col))
+                            self._connectivity.union(cell, (row - 1, col))
                         case Walls.EAST:
-                            self._connectivity.union((row, col), (row, col + 1))
+                            self._connectivity.union(cell, (row, col + 1))
                         case Walls.SOUTH:
-                            self._connectivity.union((row, col), (row + 1, col))
+                            self._connectivity.union(cell, (row + 1, col))
                         case Walls.WEST:
-                            self._connectivity.union((row, col), (row, col - 1))
+                            self._connectivity.union(cell, (row, col - 1))
         return self._connectivity
 
     @connectivity.deleter
