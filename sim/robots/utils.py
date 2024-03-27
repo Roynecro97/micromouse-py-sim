@@ -13,13 +13,13 @@ from enum import auto, Enum
 from typing import NamedTuple, overload, TYPE_CHECKING
 
 from ..directions import Direction, RelativeDirection, PRIMARY_DIRECTIONS
-from ..maze import Walls
+from ..maze import ExtendedMaze, Walls  # TODO: fix this to be the correct type after moving things in Maze
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Generator, Set
     from typing import Callable, Literal, Protocol
 
-    from ..maze import ExtendedMaze, ExtraCellInfo, Maze
+    from ..maze import ExtraCellInfo, Maze
 
 ENABLE_VICTORY_DANCE = os.environ.get('MICROMOUSE_VICTORY_DANCE', 'n') == 'y'
 
@@ -449,12 +449,53 @@ def mark_unreachable_groups(
         # group that contains the robot and all goals.
         if pos in connected_group:
             continue
-        print("unreachable:", connected_group)
+        # print("unreachable:", connected_group)
         # Reaching here means this is a disconnected group, mark it as "explored"
         for cell in connected_group:
             info: ExtraCellInfo = maze.extra_info[cell]
             info.visited = 1
             info.color = color
+
+
+def mark_deadends(
+        maze: ExtendedMaze,
+        pos: tuple[int, int],
+        start: tuple[int, int],
+        goals: Set[tuple[int, int]],
+        color: tuple[int, int, int] | str | None = 'yellow',
+) -> None:
+    """Mark deadends based on the robot's current position and set their color.
+
+    Args:
+        maze (ExtendedMaze): The maze.
+        pos (tuple[int, int]): The robot's current position.
+        start (tuple[int, int]): The robot's starting point.
+        goals (Set[tuple[int, int]]): The goals.
+        color (tuple[int, int, int] | str | None, optional): The color to mark with. Defaults to 'yellow'.
+    """
+    goals = goals | {start}
+    # Clone the maze to avoid invalidating the original maze's caches
+    tmp_maze = ExtendedMaze.full_from_maze(maze)
+    # print(tmp_maze.render_extra(pos=pos + (Direction.NORTH_EAST,), goals=goals, weights=False))
+    for missing in ~tmp_maze[pos]:
+        # Close the suspect "deadend"
+        tmp_maze.add_walls(*pos, missing)
+        # print(tmp_maze.render_extra(pos=pos + (Direction.NORTH_EAST,), goals=goals, weights=False))
+        # Check connectivity
+        connectivity = tmp_maze.connectivity
+        pos_group = connectivity.find(pos)
+        if all(pos_group == connectivity.find(goal) for goal in goals):
+            for connected_group in iter(connectivity.iter_sets()):
+                if pos in connected_group:
+                    continue
+                # print("deadend:", connected_group)
+                # Reaching here means this is a deadend, mark it as "explored" (in the original maze!)
+                for cell in connected_group:
+                    info: ExtraCellInfo = maze.extra_info[cell]
+                    info.visited = 1
+                    info.color = color
+        # Remove the imaginary wall
+        tmp_maze.remove_walls(*pos, missing)
 
 
 def identity[T](obj: T) -> T:

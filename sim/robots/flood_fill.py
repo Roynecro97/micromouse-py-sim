@@ -12,8 +12,19 @@ from functools import partial, reduce
 from operator import or_
 from typing import Protocol, TypedDict, TYPE_CHECKING
 
-from .utils import Action, adjacent_cells, direction_to_cell, shuffled, walls_to_directions
-from .utils import build_weighted_graph, dijkstra, identity, mark_unreachable_groups
+from .utils import (
+    Action,
+    abs_turn_to_actions,
+    adjacent_cells,
+    build_weighted_graph,
+    dijkstra,
+    direction_to_cell,
+    identity,
+    mark_deadends,
+    mark_unreachable_groups,
+    shuffled,
+    walls_to_directions,
+)
 from .const import predetermined_path_robot
 from ..directions import Direction, RelativeDirection
 from ..maze import Walls
@@ -189,10 +200,10 @@ def single_flood_fill(  # pylint: disable=too-many-locals
     else:
         _loop_calc_flood_fill = _do_nothing
 
-    def _assert_turn(r: int, c: int, heading: Direction):
+    def _assert_turn(r: int, c: int, heading: Direction) -> Direction:
         assert (r, c) == pos, "moved while turning"
         assert maze[r, c] == walls, "walls changed while turning"
-        assert heading == new_direction, "turning failed"
+        return heading
 
     _calc_flood_fill(force=True)
 
@@ -212,24 +223,13 @@ def single_flood_fill(  # pylint: disable=too-many-locals
             key=_priority,
         )
         print(f"floodmouse: chose to flood {new_direction}")
-        if new_direction == heading:
-            print("floodmouse: will move forward")
-            action = Action.FORWARD
-        elif new_direction == heading.turn_back():
-            print("floodmouse: will move in reverse")
-            action = Action.BACKWARDS
-        else:
-            if new_direction == heading.turn_left():
-                print("floodmouse: turning left")
-                turn_action = Action.TURN_LEFT
-            elif new_direction == heading.turn_right():
-                print("floodmouse: turning right")
-                turn_action = Action.TURN_RIGHT
-            else:
-                raise AssertionError(f"invalid turn from {heading} to {new_direction}")
-            _assert_turn(*(yield turn_action))
-            print(f"floodmouse: now facing {heading}, will move forward")
-            action = Action.FORWARD
+        *turn_actions, action = abs_turn_to_actions(heading, new_direction, allow_reverse=False)
+        assert action is Action.FORWARD, f"actions don't end with a step ({turn_actions=}, {action=})"
+        assert set(turn_actions).issubset({Action.TURN_LEFT, Action.TURN_RIGHT}), f"not only turns({turn_actions})"
+        for turn_action in turn_actions:
+            print(f"floodmouse: turning {action.name.removeprefix('TURN_').lower()}")
+            heading = _assert_turn(*(yield turn_action))
+        assert heading == new_direction, "turning failed"
         pos_row, pos_col, heading = yield action
         maze.route.append(pos := (pos_row, pos_col))
 
@@ -473,10 +473,19 @@ DEFAULT_DIJKSTRA_WEIGHTS: dict[RelativeDirection, float] = {
 }
 
 
-def _calc_unknown_groups(
+def _calc_unknown_groups(  # pylint: disable=too-many-arguments
         maze: ExtendedMaze,
-        unknown_color: tuple[int, int, int] | str | None = None,
+        pos: tuple[int, int],
+        start: tuple[int, int],
+        goals: Set[tuple[int, int]],
+        unknown_color: tuple[int, int, int] | str | None = 'blue',
+        deadend_color: tuple[int, int, int] | str | None = 'orange',
 ) -> tuple[UnionFind[tuple[int, int]], set[tuple[int, int]]]:
+    def in_goal(*cells: tuple[int, int]) -> bool:
+        return all(cell in goals for cell in cells)
+
+    mark_deadends(maze, pos, start, goals, deadend_color)
+
     groups = UnionFind()
     for row, col, walls, info in maze.iter_all():
         if info.visited > 0:
@@ -494,7 +503,7 @@ def _calc_unknown_groups(
                     adjacent = (row + 1, col)
                 case Walls.WEST:
                     adjacent = (row, col - 1)
-            if maze.extra_info[adjacent].visited == 0:
+            if maze.extra_info[adjacent].visited == 0 and not in_goal((row, col), adjacent):
                 groups.union((row, col), adjacent)
                 called_union = True
         if called_union:
@@ -506,7 +515,7 @@ def _calc_unknown_groups(
     return groups, reduce(or_, groups.iter_sets(), set())
 
 
-def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+def flood_fill_thourough_explorer(  # pylint: disable=too-many-branches,too-many-statements
         maze: ExtendedMaze,
         goals: Set[tuple[int, int]],
         *,
@@ -531,8 +540,6 @@ def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-b
     if not 0 < percentage <= 1.0:
         raise ValueError(f"invalid percentage: {percentage!r}")
 
-    unknown_color = 'blue'
-
     # First, find the goal
     # We cannot use ``yield from`` because we need the final reply from the yield
     print(f"flood hunter: looking for {goals=}")
@@ -550,6 +557,7 @@ def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-b
             pos = yield flood_bot.send(pos)
         except StopIteration:
             break
+        mark_deadends(maze, pos[:-1], start, goals, 'orange')
 
     print(f"flood hunter: found goals! {start=}, {maze.explored_cells_percentage()=:.02%}/{percentage=:.02%}")
     while maze.explored_cells_percentage() < percentage:
@@ -557,7 +565,7 @@ def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-b
         # print(_render_maze(maze, goals=goals, pos=pos))
         mark_unreachable_groups(maze, pos[:-1])
 
-        unknown, all_unknown = _calc_unknown_groups(maze, unknown_color)
+        unknown, all_unknown = _calc_unknown_groups(maze, pos[:-1], start, goals)
 
         routes = dijkstra(
             build_weighted_graph(maze, DEFAULT_DIJKSTRA_WEIGHTS, start=pos),
@@ -603,7 +611,7 @@ def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-b
             except StopIteration:
                 print(f"flood hunter: reached dest - {pos=}")
                 break
-            _, all_unknown = _calc_unknown_groups(maze, unknown_color)
+            _, all_unknown = _calc_unknown_groups(maze, pos[:-1], start, goals)
         maze.extra_info[dest].color = None
 
     print(f"flood hunter: done exploring - {maze.explored_cells_percentage()=:.02%}/{percentage=:.02%}")
@@ -647,6 +655,5 @@ def thourough_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Rob
         explorer=partial(
             flood_fill_thourough_explorer,
             flood_weight=simple_flood_weight_with_strong_visit_bias,
-            minor_priority=identity,
         ),
     )
