@@ -123,8 +123,8 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
             print("sim: starting progress")
             self._status = SimulationStatus.IN_PROGRESS
 
-        row, col, facing = self._robot_pos
-        print(f"sim: robot is at {(row, col)} facing {facing}")
+        row, col, heading = self._robot_pos
+        print(f"sim: robot is at {(row, col)} facing {heading}")
 
         try:
             with timed("sim: robot step"):
@@ -152,25 +152,25 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
                 self._robot_pos = self._begin
                 self._status = SimulationStatus.READY  # Allow the robot to call ready again
             case Action.FORWARD | Action.BACKWARDS:
-                if not self._robot_step(facing if action is Action.FORWARD else facing.turn_back()):
+                if not self._robot_step(heading if action is Action.FORWARD else heading.turn_back()):
                     print("sim: step error")
                     self._status = SimulationStatus.ERROR
                 elif self._robot_pos[:-1] in self._end:
                     self._status = SimulationStatus.IN_PROGRESS_FOUND_DEST
             case Action.TURN_LEFT:
-                self._robot_pos = (row, col, facing.turn_left())
+                self._robot_pos = (row, col, heading.turn_left())
                 print("sim: robot turned left")
             case Action.TURN_RIGHT:
-                self._robot_pos = (row, col, facing.turn_right())
+                self._robot_pos = (row, col, heading.turn_right())
                 print("sim: robot turned right")
 
         return self._status
 
     def _robot_step(self, direction: Direction) -> bool:
         """Try to advance the robot in the given direction, return False if not possible."""
-        row, col, facing = self._robot_pos
+        row, col, heading = self._robot_pos
 
-        print(f"sim: stepping from {(row, col)} to {direction} (while facing {facing})")
+        print(f"sim: stepping from {(row, col)} to {direction} (while facing {heading})")
 
         if direction_to_wall(direction) in self._maze[row, col]:
             print(f"sim: crashed! {direction_to_wall(direction)=!s} to {self._maze[row, col]=!s}")
@@ -179,10 +179,10 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
 
         # No need to check boundaries because our maze is enclosed by walls
         match direction:
-            case Direction.NORTH: self._robot_pos = (row - 1, col, facing)
-            case Direction.EAST: self._robot_pos = (row, col + 1, facing)
-            case Direction.SOUTH: self._robot_pos = (row + 1, col, facing)
-            case Direction.WEST: self._robot_pos = (row, col - 1, facing)
+            case Direction.NORTH: self._robot_pos = (row - 1, col, heading)
+            case Direction.EAST: self._robot_pos = (row, col + 1, heading)
+            case Direction.SOUTH: self._robot_pos = (row + 1, col, heading)
+            case Direction.WEST: self._robot_pos = (row, col - 1, heading)
             case _: raise AssertionError(f"only the primary directions are supported right now (not {direction})")
 
         print(f"sim: robot is now at {self._robot_pos[:-1]} facing {self._robot_pos[-1]}")

@@ -42,33 +42,33 @@ def iter_robot(robot: Robot, begin: RobotState) -> Iterable[Action]:
             case Action.RESET:
                 pos = begin
             case Action.FORWARD:
-                match pos.facing:
+                match pos.heading:
                     case Direction.NORTH:
-                        pos = RobotState(pos.row - 1, pos.col, pos.facing)
+                        pos = RobotState(pos.row - 1, pos.col, pos.heading)
                     case Direction.EAST:
-                        pos = RobotState(pos.row, pos.col + 1, pos.facing)
+                        pos = RobotState(pos.row, pos.col + 1, pos.heading)
                     case Direction.SOUTH:
-                        pos = RobotState(pos.row + 1, pos.col, pos.facing)
+                        pos = RobotState(pos.row + 1, pos.col, pos.heading)
                     case Direction.WEST:
-                        pos = RobotState(pos.row, pos.col - 1, pos.facing)
+                        pos = RobotState(pos.row, pos.col - 1, pos.heading)
                     case _:
                         raise NotImplementedError("secondary directions not yet supported")
             case Action.BACKWARDS:
-                match pos.facing:
+                match pos.heading:
                     case Direction.NORTH:
-                        pos = RobotState(pos.row + 1, pos.col, pos.facing)
+                        pos = RobotState(pos.row + 1, pos.col, pos.heading)
                     case Direction.EAST:
-                        pos = RobotState(pos.row, pos.col - 1, pos.facing)
+                        pos = RobotState(pos.row, pos.col - 1, pos.heading)
                     case Direction.SOUTH:
-                        pos = RobotState(pos.row - 1, pos.col, pos.facing)
+                        pos = RobotState(pos.row - 1, pos.col, pos.heading)
                     case Direction.WEST:
-                        pos = RobotState(pos.row, pos.col + 1, pos.facing)
+                        pos = RobotState(pos.row, pos.col + 1, pos.heading)
                     case _:
                         raise NotImplementedError("secondary directions not yet supported")
             case Action.TURN_LEFT:
-                pos = RobotState(pos.row, pos.col, pos.facing.turn_left())
+                pos = RobotState(pos.row, pos.col, pos.heading.turn_left())
             case Action.TURN_RIGHT:
-                pos = RobotState(pos.row, pos.col, pos.facing.turn_right())
+                pos = RobotState(pos.row, pos.col, pos.heading.turn_right())
             case _:
                 raise AssertionError(f"unexpected action: {action!r}")
         yield action

@@ -89,7 +89,7 @@ class RobotState(NamedTuple):
     """
     row: int
     col: int
-    facing: Direction
+    heading: Direction
 
 
 if TYPE_CHECKING:

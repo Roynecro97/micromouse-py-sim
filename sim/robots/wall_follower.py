@@ -37,14 +37,14 @@ def _wall_follower_robot(
         case _: raise TypeError(f"invalid follow type: {type(follow)}")
     next_direction = follow.invert()
 
-    pos_row, pos_col, facing = yield Action.READY
+    pos_row, pos_col, heading = yield Action.READY
 
     while (pos_row, pos_col) not in goals:
         walls = maze[pos_row, pos_col]
-        if direction_to_wall(turn := facing.turn(follow)) not in walls:
+        if direction_to_wall(turn := heading.turn(follow)) not in walls:
             rel = follow
         elif direction_to_wall(turn := turn.turn(next_direction)) not in walls:
-            assert turn == facing, "turned back but didn't return"
+            assert turn == heading, "turned back but didn't return"
             rel = RelativeDirection.FRONT
         elif direction_to_wall(turn := turn.turn(next_direction)) not in walls:
             rel = next_direction
@@ -55,12 +55,12 @@ def _wall_follower_robot(
             return
 
         for turn_action in turns_for_rel_direction(rel, follow):
-            r, c, facing = yield turn_action
+            r, c, heading = yield turn_action
             assert (r, c) == (pos_row, pos_col), "moved while turning"
             assert maze[r, c] == walls, "walls changed while turning"
-        assert facing == turn, "turning failed"
+        assert heading == turn, "turning failed"
 
-        pos_row, pos_col, facing = yield Action.FORWARD
+        pos_row, pos_col, heading = yield Action.FORWARD
 
     # Victory spin
     while utils.ENABLE_VICTORY_DANCE:

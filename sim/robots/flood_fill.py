@@ -189,14 +189,14 @@ def single_flood_fill(  # pylint: disable=too-many-locals
     else:
         _loop_calc_flood_fill = _do_nothing
 
-    def _assert_turn(r: int, c: int, facing: Direction):
+    def _assert_turn(r: int, c: int, heading: Direction):
         assert (r, c) == pos, "moved while turning"
         assert maze[r, c] == walls, "walls changed while turning"
-        assert facing == new_direction, "turning failed"
+        assert heading == new_direction, "turning failed"
 
     _calc_flood_fill(force=True)
 
-    pos_row, pos_col, facing = yield Action.READY
+    pos_row, pos_col, heading = yield Action.READY
     maze.route.append(pos := (pos_row, pos_col))
 
     while pos not in goals:
@@ -206,31 +206,31 @@ def single_flood_fill(  # pylint: disable=too-many-locals
             print("floodmouse: cannot reach goals, giving up")
             break
         walls = maze[pos_row, pos_col]
-        print(f"floodmouse: at {pos} facing {facing} with {walls}")
+        print(f"floodmouse: at {pos} facing {heading} with {walls}")
         new_direction = min(
             minor_priority(walls_to_directions(walls)),  # regular / reversed / shuffled
             key=_priority,
         )
         print(f"floodmouse: chose to flood {new_direction}")
-        if new_direction == facing:
+        if new_direction == heading:
             print("floodmouse: will move forward")
             action = Action.FORWARD
-        elif new_direction == facing.turn_back():
+        elif new_direction == heading.turn_back():
             print("floodmouse: will move in reverse")
             action = Action.BACKWARDS
         else:
-            if new_direction == facing.turn_left():
+            if new_direction == heading.turn_left():
                 print("floodmouse: turning left")
                 turn_action = Action.TURN_LEFT
-            elif new_direction == facing.turn_right():
+            elif new_direction == heading.turn_right():
                 print("floodmouse: turning right")
                 turn_action = Action.TURN_RIGHT
             else:
-                raise AssertionError(f"invalid turn from {facing} to {new_direction}")
+                raise AssertionError(f"invalid turn from {heading} to {new_direction}")
             _assert_turn(*(yield turn_action))
-            print(f"floodmouse: now facing {facing}, will move forward")
+            print(f"floodmouse: now facing {heading}, will move forward")
             action = Action.FORWARD
-        pos_row, pos_col, facing = yield action
+        pos_row, pos_col, heading = yield action
         maze.route.append(pos := (pos_row, pos_col))
 
 
