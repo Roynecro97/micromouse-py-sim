@@ -714,6 +714,17 @@ class ExtraCellInfo(NumpyCheat):
         """Increase the visit counter for the cell."""
         self.visited += 1
 
+    def reset_color_if(self, color: tuple[int, int, int] | str | None = None) -> None:
+        """Reset the color field to ``None``.
+
+        Args:
+            color (tuple[int, int, int] | str | None, optional):
+                If not ``None``, reset the color field only if it is equal to the provided color.
+                Defaults to None.
+        """
+        if color is None or self.color == color:
+            self.color = None
+
 
 if TYPE_CHECKING:
     type Step = tuple[int, int]

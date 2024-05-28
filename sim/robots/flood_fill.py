@@ -486,11 +486,10 @@ def _calc_unknown_groups(  # pylint: disable=too-many-arguments
 
     mark_deadends(maze, pos, start, goals, deadend_color)
 
-    groups = UnionFind()
+    groups: UnionFind[tuple[int, int]] = UnionFind()
     for row, col, walls, info in maze.iter_all():
         if info.visited > 0:
-            if info.color == unknown_color:
-                info.color = None
+            info.reset_color_if(unknown_color)
             continue
         called_union = False
         for missing in ~walls:
@@ -503,6 +502,8 @@ def _calc_unknown_groups(  # pylint: disable=too-many-arguments
                     adjacent = (row + 1, col)
                 case Walls.WEST:
                     adjacent = (row, col - 1)
+                case _:
+                    raise AssertionError("unexpected wall")
             if maze.extra_info[adjacent].visited == 0 and not in_goal((row, col), adjacent):
                 groups.union((row, col), adjacent)
                 called_union = True
@@ -510,7 +511,7 @@ def _calc_unknown_groups(  # pylint: disable=too-many-arguments
             if info.color is None and unknown_color is not None:
                 info.color = unknown_color
         else:
-            info.color = None
+            info.reset_color_if(unknown_color)
             info.visited = 1
     return groups, reduce(or_, groups.iter_sets(), set())
 
@@ -612,7 +613,7 @@ def flood_fill_thorough_explorer(  # pylint: disable=too-many-branches,too-many-
                 print(f"flood hunter: reached dest - {pos=}")
                 break
             _, all_unknown = _calc_unknown_groups(maze, pos[:-1], start, goals)
-        maze.extra_info[dest].color = None
+        maze.extra_info[dest].reset_color_if('green')
 
     print(f"flood hunter: done exploring - {maze.explored_cells_percentage()=:.02%}/{percentage=:.02%}")
     while pos[:-1] != start:
