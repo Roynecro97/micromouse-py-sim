@@ -515,7 +515,7 @@ def _calc_unknown_groups(  # pylint: disable=too-many-arguments
     return groups, reduce(or_, groups.iter_sets(), set())
 
 
-def flood_fill_thourough_explorer(  # pylint: disable=too-many-branches,too-many-statements
+def flood_fill_thorough_explorer(  # pylint: disable=too-many-branches,too-many-statements
         maze: ExtendedMaze,
         goals: Set[tuple[int, int]],
         *,
@@ -643,7 +643,7 @@ def flood_fill_thourough_explorer(  # pylint: disable=too-many-branches,too-many
                 break  # recalculate route, a new wall was added
 
 
-def thourough_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robot:
+def thorough_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robot:
     """A robot that solves the maze using an advanced implementation of the flood-fill algorithm and some dijkstra.
 
     Returns:
@@ -653,7 +653,7 @@ def thourough_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Rob
         maze,
         goals,
         explorer=partial(
-            flood_fill_thourough_explorer,
+            flood_fill_thorough_explorer,
             flood_weight=simple_flood_weight_with_strong_visit_bias,
         ),
     )
