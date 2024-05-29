@@ -336,7 +336,7 @@ def flood_fill_robot(  # pylint: disable=too-many-arguments
             goals,
             weight=weight_with_avoid_cells(final_weight, unknown_cells, final_unknown_penalty),
             minor_priority=final_minor_priority,
-            recalculate_flood=math.isinf(final_unknown_penalty) and final_unknown_penalty > 0,
+            recalculate_flood=not math.isinf(final_unknown_penalty),
         )
 
     return _flood_fill_robot_impl
