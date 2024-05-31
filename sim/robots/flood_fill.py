@@ -616,6 +616,7 @@ def flood_fill_thorough_explorer(  # pylint: disable=too-many-branches,too-many-
         maze.extra_info[dest].reset_color_if('green')
 
     print(f"flood hunter: done exploring - {maze.explored_cells_percentage()=:.02%}/{percentage=:.02%}")
+    _ = maze.changed()  # Consume the change marker
     while pos[:-1] != start:
         routes = dijkstra(
             build_weighted_graph(maze, DEFAULT_DIJKSTRA_WEIGHTS, start=pos),
@@ -640,7 +641,6 @@ def flood_fill_thorough_explorer(  # pylint: disable=too-many-branches,too-many-
                 break
             if maze.changed():
                 print("flood hunter: encountered a wall while going home")
-                maze.mark_changed()  # restore mark
                 break  # recalculate route, a new wall was added
 
 
