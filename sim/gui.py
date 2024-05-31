@@ -405,11 +405,12 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
         self.full_maze_center = self.full_maze_offset + Position(self.sim.maze.width * self.half_tile, 0)
         self.robot_maze_offset = self.full_maze_offset + Position((self.sim.maze.width + 1) * self.tile_size, 0)
         self.robot_maze_center = self.robot_maze_offset + Position(self.sim.maze.width * self.half_tile, 0)
-        self.start_button.set_position((self.screen_width // 2 - 2 * self.tile_size, 0.5 * self.text_size))
+        middle_width = self.screen_width // 2
+        self.start_button.set_position((middle_width - 2 * self.tile_size, 0.5 * self.text_size))
         self.start_button.set_dimensions((3 * self.tile_size, 1.5 * self.text_size))
-        self.step_button.set_position((self.screen_width // 2 + 2 * self.tile_size, 0.5 * self.text_size))
+        self.step_button.set_position((middle_width + 2 * self.tile_size, 0.5 * self.text_size))
         self.step_button.set_dimensions((3 * self.tile_size, 1.5 * self.text_size))
-        self.sim_speed_slider.set_position((self.screen_width // 2 + 8 * self.tile_size, 0.5 * self.text_size))
+        self.sim_speed_slider.set_position((middle_width + 8 * self.tile_size, 0.5 * self.text_size))
         self.sim_speed_slider.set_dimensions((10 * self.text_size, 1.5 * self.text_size))
         # self.browse_button.set_position((8 * self.tile_size, 0))
         # self.browse_button.set_dimensions((5 * self.tile_size, self.tile_size))
@@ -482,6 +483,8 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
                 robot_heading,
             )
 
+            middle_width = self.screen_width // 2
+
             # texts for menus:
             # self.draw_text(
             #    'Preset:',
@@ -504,14 +507,44 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
                 Position(0, 2 * self.tile_size + self.half_tile),
             )
             self.draw_text(
-                f'Goal(s): {self.sim.end}',
+                f'Steps: {self.sim.counter.current_step}',
+                self.text_size,
+                Position(middle_width - 6 * self.tile_size, 2 * self.tile_size + self.half_tile),
+            )
+            self.draw_text(
+                f'Weight: {self.sim.counter.current_weight}',
+                self.text_size,
+                Position(middle_width, 2 * self.tile_size + self.half_tile),
+            )
+            self.draw_text(
+                f'Cells: {self.sim.counter.current_cell}',
+                self.text_size,
+                Position(middle_width + 7 * self.tile_size, 2 * self.tile_size + self.half_tile),
+            )
+            self.draw_text(
+                f'Goal(s): {', '.join(map(str, self.sim.end))}',
                 self.text_size,
                 Position(0, 3 * self.tile_size + self.half_tile),
             )
             self.draw_text(
+                f'Total Steps: {self.sim.counter.total_step}',
+                self.text_size,
+                Position(middle_width - 6 * self.tile_size, 3 * self.tile_size + self.half_tile),
+            )
+            self.draw_text(
+                f'Total Weight: {self.sim.counter.total_weight}',
+                self.text_size,
+                Position(middle_width, 3 * self.tile_size + self.half_tile),
+            )
+            self.draw_text(
+                f'Total Cells: {self.sim.counter.total_cell}',
+                self.text_size,
+                Position(middle_width + 7 * self.tile_size, 3 * self.tile_size + self.half_tile),
+            )
+            self.draw_text(
                 f'Simulation Delay [s]: {self.sim_speed_slider.get_current_value():.3f}',
                 self.text_size,
-                Position(self.screen_width // 2 + 7 * self.tile_size, 2 * self.text_size),
+                Position(middle_width + 7 * self.tile_size, 2 * self.text_size),
             )
 
             self.update(time_delta)
