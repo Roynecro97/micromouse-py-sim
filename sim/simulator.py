@@ -6,8 +6,9 @@ import sys
 import time
 
 from contextlib import contextmanager
+from dataclasses import dataclass
 from enum import auto, Enum
-from typing import TYPE_CHECKING
+from typing import Self, TYPE_CHECKING
 
 from .directions import Direction, RelativeDirection
 from .maze import ExtendedMaze, Maze
@@ -19,6 +20,88 @@ if TYPE_CHECKING:
 
     from .robots import Algorithm, Robot
     from .maze import ExtraCellInfo
+
+
+@dataclass
+class CounterData:
+    """A counter with current and total."""
+    current: int = 0
+    total: int = 0
+
+    def __iadd__(self, amount: int) -> Self:
+        """Increment counters by amount."""
+        self.current += amount
+        self.total += amount
+        return self
+
+
+class Counter:
+    """A counter for various robot actions."""
+
+    def __init__(self) -> None:
+        self._step = CounterData()
+        self._weight = CounterData()
+        self._cell = CounterData()
+
+    def count_action(self, action: Action) -> None:
+        """Update counters by the robot's action."""
+        self._step += 1
+        match action:
+            case Action.READY:
+                weight = 0
+                cell_advanced = False
+            case Action.RESET:
+                weight = 0
+                cell_advanced = False
+                self.reset_current()
+            case Action.FORWARD:
+                weight = 1
+                cell_advanced = True
+            case Action.BACKWARDS:
+                weight = 2
+                cell_advanced = True
+            case Action.TURN_LEFT | Action.TURN_RIGHT:
+                weight = 4 - 1
+                cell_advanced = False
+
+        self._weight += weight
+        self._cell += int(cell_advanced)
+
+    def reset_current(self) -> None:
+        """Reset current counters."""
+        self._step.current = 0
+        self._weight.current = 0
+        self._cell.current = 0
+
+    @property
+    def current_step(self) -> int:
+        """The number of steps that the robot made this run."""
+        return self._step.current
+
+    @property
+    def total_step(self) -> int:
+        """The total number of steps that the robot made."""
+        return self._step.total
+
+    @property
+    def current_weight(self) -> int:
+        """The weight of actions that the robot made this run."""
+        return self._weight.current
+
+    @property
+    def total_weight(self) -> int:
+        """The total weight of actions that the robot made."""
+        return self._weight.total
+
+    @property
+    def current_cell(self) -> int:
+        """The number of cells that the robot stepped through this run."""
+        return self._cell.current
+
+    @property
+    def total_cell(self) -> int:
+        """The total number of cells that the robot stepped through."""
+        return self._cell.total
 
 
 class SimulationStatus(Enum):
@@ -53,6 +136,7 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
     """A micromouse simulator."""
     _status: SimulationStatus
     __robot_pos: tuple[int, int, Direction]
+    _counter: Counter
 
     def __init__(self, alg: Algorithm, maze: Maze, begin: tuple[int, int, Direction], end: Iterable[tuple[int, int]]):
         self._maze = ExtendedMaze.full_from_maze(maze)
@@ -107,6 +191,7 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
             raise RuntimeError(f"robot malfunction - yielded {state} instead of {Action.READY}")
         self._status = SimulationStatus.READY
         print("sim: robot is ready")
+        self._counter = Counter()
 
     def step(self) -> SimulationStatus:
         """Perform a single robot action."""
@@ -164,6 +249,7 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
                 self._robot_pos = (row, col, heading.turn_right())
                 print("sim: robot turned right")
 
+        self._counter.count_action(action)
         return self._status
 
     def _robot_step(self, direction: Direction) -> bool:
@@ -231,6 +317,11 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
     def status(self) -> SimulationStatus:
         """The status of the simulator."""
         return self._status
+
+    @property
+    def counter(self) -> Counter:  # TODO: readonly version
+        """The counter used by the simulator."""
+        return self._counter
 
     def connected(self, a: tuple[int, int] | Iterable[tuple[int, int]], b: tuple[int, int] | Iterable[tuple[int, int]]) -> bool:
         """Check if two cells (or cell groups) are connected in the maze."""

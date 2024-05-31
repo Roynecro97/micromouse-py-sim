@@ -348,7 +348,7 @@ def simple_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robot:
     Returns:
         Robot: The robot's brain.
     """
-    return flood_fill_robot(final_unknown_penalty=0)(maze, goals)
+    return flood_fill_robot(minor_priority=reversed, final_unknown_penalty=0)(maze, goals)
 
 
 def dijkstra_solver(
@@ -459,8 +459,8 @@ def basic_weighted_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -
         goals,
         explorer=partial(
             flood_fill_explore,
-            weight=simple_flood_weight_with_strong_visit_bias,
-            minor_priority=identity,
+            weight=simple_flood_weight,
+            minor_priority=reversed,
         ),
     )
 
