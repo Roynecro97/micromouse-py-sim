@@ -10,10 +10,10 @@ import pytest
 from sim.directions import Direction, RelativeDirection
 
 
-__RELATIVE_DIRECTION_PAIRS: set[tuple[RelativeDirection, RelativeDirection]] = {
+__RELATIVE_DIRECTION_PAIRS: frozenset[tuple[RelativeDirection, RelativeDirection]] = frozenset({
     (RelativeDirection.FRONT, RelativeDirection.BACK),
     (RelativeDirection.LEFT, RelativeDirection.RIGHT),
-}
+})
 
 __INVERTED_DIRECTIONS = dict(__RELATIVE_DIRECTION_PAIRS) | {
     b: a for a, b in __RELATIVE_DIRECTION_PAIRS

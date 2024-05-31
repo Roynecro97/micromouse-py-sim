@@ -12,8 +12,19 @@ from functools import partial, reduce
 from operator import or_
 from typing import Protocol, TypedDict, TYPE_CHECKING
 
-from .utils import Action, adjacent_cells, direction_to_cell, shuffled, walls_to_directions
-from .utils import build_weighted_graph, dijkstra, identity, mark_unreachable_groups
+from .utils import (
+    Action,
+    abs_turn_to_actions,
+    adjacent_cells,
+    build_weighted_graph,
+    dijkstra,
+    direction_to_cell,
+    identity,
+    mark_deadends,
+    mark_unreachable_groups,
+    shuffled,
+    walls_to_directions,
+)
 from .const import predetermined_path_robot
 from ..directions import Direction, RelativeDirection
 from ..maze import Walls
@@ -71,13 +82,13 @@ def simple_flood_weight_with_strong_visit_bias(**kwargs: Unpack[WeightArgs]) -> 
     return kwargs['marker'] + round(kwargs['info'].visited * 0.5)
 
 
-def weight_with_avoid_cells(weight: WeightCalc, avoid: set[tuple[int, int]], avoid_weight: float = UNREACHABLE_WEIGHT) -> WeightCalc:
+def weight_with_avoid_cells(weight: WeightCalc, avoid: Set[tuple[int, int]], avoid_weight: float = UNREACHABLE_WEIGHT) -> WeightCalc:
     """
     Create a weight generator that avoids certain cells by adding a penalty to their weight.
 
     Args:
         weight (WeightCalc): A weight function for cells that are not avoided.
-        avoid (set[tuple[int, int]]): The cells to avoid.
+        avoid (Set[tuple[int, int]]): The cells to avoid.
         avoid_weight (float, optional):
             The weight penalty for avoided cells, this is added to the regular weight.
             Defaults to UNREACHABLE_WEIGHT.
@@ -99,7 +110,7 @@ def weight_with_avoid_cells(weight: WeightCalc, avoid: set[tuple[int, int]], avo
 
 def calc_flood_fill(
         maze: ExtendedMaze,
-        goals: set[tuple[int, int]],
+        goals: Set[tuple[int, int]],
         weight: WeightCalc = simple_flood_weight,
         *,
         force: bool = False,
@@ -108,7 +119,7 @@ def calc_flood_fill(
 
     Args:
         maze (ExtendedMaze): The maze to flood.
-        goals (set[tuple[int, int]]): The goals to flood to.
+        goals (Set[tuple[int, int]]): The goals to flood to.
         robot_pos (tuple[int, int]): The starting position for the flood.
         robot_direction (Direction): The starting direction for the flood.
         weight (WeightCalc, optional): The weight function for the flood. Defaults to simple_flood_weight.
@@ -160,7 +171,7 @@ def _do_nothing() -> None:
 
 def single_flood_fill(  # pylint: disable=too-many-locals
         maze: ExtendedMaze,
-        goals: set[tuple[int, int]],
+        goals: Set[tuple[int, int]],
         *,
         weight: WeightCalc = simple_flood_weight,
         minor_priority: MinorPriority = shuffled,
@@ -189,14 +200,14 @@ def single_flood_fill(  # pylint: disable=too-many-locals
     else:
         _loop_calc_flood_fill = _do_nothing
 
-    def _assert_turn(r: int, c: int, facing: Direction):
+    def _assert_turn(r: int, c: int, heading: Direction) -> Direction:
         assert (r, c) == pos, "moved while turning"
         assert maze[r, c] == walls, "walls changed while turning"
-        assert facing == new_direction, "turning failed"
+        return heading
 
     _calc_flood_fill(force=True)
 
-    pos_row, pos_col, facing = yield Action.READY
+    pos_row, pos_col, heading = yield Action.READY
     maze.route.append(pos := (pos_row, pos_col))
 
     while pos not in goals:
@@ -206,37 +217,26 @@ def single_flood_fill(  # pylint: disable=too-many-locals
             print("floodmouse: cannot reach goals, giving up")
             break
         walls = maze[pos_row, pos_col]
-        print(f"floodmouse: at {pos} facing {facing} with {walls}")
+        print(f"floodmouse: at {pos} facing {heading} with {walls}")
         new_direction = min(
             minor_priority(walls_to_directions(walls)),  # regular / reversed / shuffled
             key=_priority,
         )
         print(f"floodmouse: chose to flood {new_direction}")
-        if new_direction == facing:
-            print("floodmouse: will move forward")
-            action = Action.FORWARD
-        elif new_direction == facing.turn_back():
-            print("floodmouse: will move in reverse")
-            action = Action.BACKWARDS
-        else:
-            if new_direction == facing.turn_left():
-                print("floodmouse: turning left")
-                turn_action = Action.TURN_LEFT
-            elif new_direction == facing.turn_right():
-                print("floodmouse: turning right")
-                turn_action = Action.TURN_RIGHT
-            else:
-                raise AssertionError(f"invalid turn from {facing} to {new_direction}")
-            _assert_turn(*(yield turn_action))
-            print(f"floodmouse: now facing {facing}, will move forward")
-            action = Action.FORWARD
-        pos_row, pos_col, facing = yield action
+        *turn_actions, action = abs_turn_to_actions(heading, new_direction, allow_reverse=False)
+        assert action is Action.FORWARD, f"actions don't end with a step ({turn_actions=}, {action=})"
+        assert set(turn_actions).issubset({Action.TURN_LEFT, Action.TURN_RIGHT}), f"not only turns({turn_actions})"
+        for turn_action in turn_actions:
+            print(f"floodmouse: turning {action.name.removeprefix('TURN_').lower()}")
+            heading = _assert_turn(*(yield turn_action))
+        assert heading == new_direction, "turning failed"
+        pos_row, pos_col, heading = yield action
         maze.route.append(pos := (pos_row, pos_col))
 
 
 def flood_fill_explore(
         maze: ExtendedMaze,
-        goals: set[tuple[int, int]],
+        goals: Set[tuple[int, int]],
         *,
         weight: WeightCalc = simple_flood_weight,
         minor_priority: MinorPriority = shuffled,
@@ -245,7 +245,7 @@ def flood_fill_explore(
 
     Args:
         maze (ExtendedMaze): The maze.
-        goals (set[tuple[int, int]]): The goal cells.
+        goals (Set[tuple[int, int]]): The goal cells.
         weight (WeightCalc, optional): The weight function. Defaults to simple_flood_weight.
         minor_priority (MinorPriority, optional):
             The last priority in selecting cells. Defaults to shuffled.
@@ -307,7 +307,7 @@ def flood_fill_robot(  # pylint: disable=too-many-arguments
     if final_minor_priority is None:
         final_minor_priority = minor_priority
 
-    def _flood_fill_robot_impl(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot:
+    def _flood_fill_robot_impl(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robot:
         """A robot that solves the maze using a simple implementation of the flood-fill algorithm.
 
         Returns:
@@ -336,13 +336,13 @@ def flood_fill_robot(  # pylint: disable=too-many-arguments
             goals,
             weight=weight_with_avoid_cells(final_weight, unknown_cells, final_unknown_penalty),
             minor_priority=final_minor_priority,
-            recalculate_flood=math.isinf(final_unknown_penalty) and final_unknown_penalty > 0,
+            recalculate_flood=not math.isinf(final_unknown_penalty),
         )
 
     return _flood_fill_robot_impl
 
 
-def simple_flood_fill(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot:
+def simple_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robot:
     """A robot that solves the maze using a simple implementation of the flood-fill algorithm.
 
     Returns:
@@ -353,7 +353,7 @@ def simple_flood_fill(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot:
 
 def dijkstra_solver(
         maze: ExtendedMaze,
-        goals: set[tuple[int, int]],
+        goals: Set[tuple[int, int]],
         *,
         pos: RobotState | None = None,
         unknown_cells: Set[tuple[int, int]] = frozenset(),
@@ -421,7 +421,7 @@ def dijkstra_solver(
 
 def _two_step_robot(
         maze: ExtendedMaze,
-        goals: set[tuple[int, int]],
+        goals: Set[tuple[int, int]],
         *,
         explorer: Algorithm = flood_fill_explore,
         solver: SolverAlgorithm = dijkstra_solver,
@@ -448,7 +448,7 @@ def _two_step_robot(
     yield from solver(maze, goals, pos=pos, unknown_cells=unknown_cells)
 
 
-def basic_weighted_flood_fill(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot:
+def basic_weighted_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robot:
     """A robot that solves the maze using a simple implementation of the flood-fill algorithm.
 
     Returns:
@@ -473,15 +473,23 @@ DEFAULT_DIJKSTRA_WEIGHTS: dict[RelativeDirection, float] = {
 }
 
 
-def _calc_unknown_groups(
+def _calc_unknown_groups(  # pylint: disable=too-many-arguments
         maze: ExtendedMaze,
-        unknown_color: tuple[int, int, int] | str | None = None,
+        pos: tuple[int, int],
+        start: tuple[int, int],
+        goals: Set[tuple[int, int]],
+        unknown_color: tuple[int, int, int] | str | None = 'blue',
+        deadend_color: tuple[int, int, int] | str | None = 'orange',
 ) -> tuple[UnionFind[tuple[int, int]], set[tuple[int, int]]]:
-    groups = UnionFind()
+    def in_goal(*cells: tuple[int, int]) -> bool:
+        return all(cell in goals for cell in cells)
+
+    mark_deadends(maze, pos, start, goals, deadend_color)
+
+    groups: UnionFind[tuple[int, int]] = UnionFind()
     for row, col, walls, info in maze.iter_all():
         if info.visited > 0:
-            if info.color == unknown_color:
-                info.color = None
+            info.reset_color_if(unknown_color)
             continue
         called_union = False
         for missing in ~walls:
@@ -494,21 +502,23 @@ def _calc_unknown_groups(
                     adjacent = (row + 1, col)
                 case Walls.WEST:
                     adjacent = (row, col - 1)
-            if maze.extra_info[adjacent].visited == 0:
+                case _:
+                    raise AssertionError("unexpected wall")
+            if maze.extra_info[adjacent].visited == 0 and not in_goal((row, col), adjacent):
                 groups.union((row, col), adjacent)
                 called_union = True
         if called_union:
             if info.color is None and unknown_color is not None:
                 info.color = unknown_color
         else:
-            info.color = None
+            info.reset_color_if(unknown_color)
             info.visited = 1
     return groups, reduce(or_, groups.iter_sets(), set())
 
 
-def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+def flood_fill_thorough_explorer(  # pylint: disable=too-many-branches,too-many-statements
         maze: ExtendedMaze,
-        goals: set[tuple[int, int]],
+        goals: Set[tuple[int, int]],
         *,
         percentage: float = 1.0,
         flood_weight: WeightCalc = simple_flood_weight,
@@ -520,7 +530,7 @@ def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-b
 
     Args:
         maze (ExtendedMaze): The maze.
-        goals (set[tuple[int, int]]): The final goals.
+        goals (Set[tuple[int, int]]): The final goals.
         percentage (float, optional): The percentage of the maze to explore before returning home. Defaults to 1.0.
         flood_weight (WeightCalc, optional): Exploration weight. Defaults to simple_flood_weight.
         minor_priority (MinorPriority, optional): Exploration minor priority. Defaults to identity.
@@ -530,8 +540,6 @@ def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-b
     """
     if not 0 < percentage <= 1.0:
         raise ValueError(f"invalid percentage: {percentage!r}")
-
-    unknown_color = 'blue'
 
     # First, find the goal
     # We cannot use ``yield from`` because we need the final reply from the yield
@@ -550,6 +558,7 @@ def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-b
             pos = yield flood_bot.send(pos)
         except StopIteration:
             break
+        mark_deadends(maze, pos[:-1], start, goals, 'orange')
 
     print(f"flood hunter: found goals! {start=}, {maze.explored_cells_percentage()=:.02%}/{percentage=:.02%}")
     while maze.explored_cells_percentage() < percentage:
@@ -557,7 +566,7 @@ def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-b
         # print(_render_maze(maze, goals=goals, pos=pos))
         mark_unreachable_groups(maze, pos[:-1])
 
-        unknown, all_unknown = _calc_unknown_groups(maze, unknown_color)
+        unknown, all_unknown = _calc_unknown_groups(maze, pos[:-1], start, goals)
 
         routes = dijkstra(
             build_weighted_graph(maze, DEFAULT_DIJKSTRA_WEIGHTS, start=pos),
@@ -603,10 +612,11 @@ def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-b
             except StopIteration:
                 print(f"flood hunter: reached dest - {pos=}")
                 break
-            _, all_unknown = _calc_unknown_groups(maze, unknown_color)
-        maze.extra_info[dest].color = None
+            _, all_unknown = _calc_unknown_groups(maze, pos[:-1], start, goals)
+        maze.extra_info[dest].reset_color_if('green')
 
     print(f"flood hunter: done exploring - {maze.explored_cells_percentage()=:.02%}/{percentage=:.02%}")
+    _ = maze.changed()  # Consume the change marker
     while pos[:-1] != start:
         routes = dijkstra(
             build_weighted_graph(maze, DEFAULT_DIJKSTRA_WEIGHTS, start=pos),
@@ -631,11 +641,10 @@ def flood_fill_thourough_explorer(  # pylint: disable=too-many-locals,too-many-b
                 break
             if maze.changed():
                 print("flood hunter: encountered a wall while going home")
-                maze.mark_changed()  # restore mark
                 break  # recalculate route, a new wall was added
 
 
-def thourough_flood_fill(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Robot:
+def thorough_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robot:
     """A robot that solves the maze using an advanced implementation of the flood-fill algorithm and some dijkstra.
 
     Returns:
@@ -645,8 +654,7 @@ def thourough_flood_fill(maze: ExtendedMaze, goals: set[tuple[int, int]]) -> Rob
         maze,
         goals,
         explorer=partial(
-            flood_fill_thourough_explorer,
+            flood_fill_thorough_explorer,
             flood_weight=simple_flood_weight_with_strong_visit_bias,
-            minor_priority=identity,
         ),
     )

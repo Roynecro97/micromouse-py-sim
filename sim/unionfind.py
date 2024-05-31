@@ -87,11 +87,11 @@ class UnionFind[T]:
     def __getitem__(self, element: T) -> T:
         return self.find(element)
 
-    def _sets_set(self) -> set[tuple[T, ...]]:
+    def _sets_set(self) -> frozenset[frozenset[T]]:
         """
-        Return a set of tuples of the values in each set in the UnionFind.
+        Return a frozenset of frozensets of the values in each set in the UnionFind.
         """
-        return {tuple(x) for x in self.iter_sets()}
+        return frozenset({frozenset(x) for x in self.iter_sets()})
 
     def __eq__(self, other: Any) -> bool:
         """

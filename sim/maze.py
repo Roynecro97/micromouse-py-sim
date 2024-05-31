@@ -714,6 +714,17 @@ class ExtraCellInfo(NumpyCheat):
         """Increase the visit counter for the cell."""
         self.visited += 1
 
+    def reset_color_if(self, color: tuple[int, int, int] | str | None = None) -> None:
+        """Reset the color field to ``None``.
+
+        Args:
+            color (tuple[int, int, int] | str | None, optional):
+                If not ``None``, reset the color field only if it is equal to the provided color.
+                Defaults to None.
+        """
+        if color is None or self.color == color:
+            self.color = None
+
 
 if TYPE_CHECKING:
     type Step = tuple[int, int]
@@ -813,16 +824,17 @@ class ExtendedMaze(Maze):
         if self._connectivity is None:
             self._connectivity = UnionFind()
             for row, col, walls in self:
+                self._connectivity.find(cell := (row, col))
                 for missing in ~walls:
                     match missing:
                         case Walls.NORTH:
-                            self._connectivity.union((row, col), (row - 1, col))
+                            self._connectivity.union(cell, (row - 1, col))
                         case Walls.EAST:
-                            self._connectivity.union((row, col), (row, col + 1))
+                            self._connectivity.union(cell, (row, col + 1))
                         case Walls.SOUTH:
-                            self._connectivity.union((row, col), (row + 1, col))
+                            self._connectivity.union(cell, (row + 1, col))
                         case Walls.WEST:
-                            self._connectivity.union((row, col), (row, col - 1))
+                            self._connectivity.union(cell, (row, col - 1))
         return self._connectivity
 
     @connectivity.deleter

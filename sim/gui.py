@@ -13,7 +13,7 @@ from typing import Iterable, NamedTuple, Self
 
 from .directions import Direction, RelativeDirection
 from .maze import ExtraCellInfo, ExtendedMaze, Maze, Walls
-from .robots import basic_weighted_flood_fill, idle_robot, random_robot, simple_flood_fill, thourough_flood_fill, wall_follower_robot
+from .robots import basic_weighted_flood_fill, idle_robot, random_robot, simple_flood_fill, thorough_flood_fill, wall_follower_robot
 from .simulator import SimulationStatus, Simulator
 
 # Disable the prompt triggered by importing `pygame`.
@@ -31,7 +31,7 @@ ROBOTS = {
     'Right Wall Follower': wall_follower_robot(RelativeDirection.RIGHT),
     'Flood Fill': simple_flood_fill,
     'Flood Fill -> Dijkstra': basic_weighted_flood_fill,
-    'Thourough Flood Fill': thourough_flood_fill,
+    'Thourough Flood Fill': thorough_flood_fill,
 }
 
 
@@ -197,7 +197,7 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
         elif event.type == pg.KEYDOWN:
             match (event.key, event.mod & pg.KMOD_SHIFT != 0):
                 case (pg.K_d, _):
-                    self.sim.restart(thourough_flood_fill)
+                    self.sim.restart(thorough_flood_fill)
                 case (pg.K_f, True):
                     self.sim.restart(simple_flood_fill)
                 case (pg.K_f, _):
