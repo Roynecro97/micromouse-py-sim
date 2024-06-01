@@ -27,13 +27,13 @@ from .utils import (
 )
 from .const import predetermined_path_robot
 from ..directions import Direction, RelativeDirection
-from ..maze import Walls
+from ..maze import ExtendedMaze, Walls
 from ..unionfind import UnionFind
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Set
     from typing import Callable, Unpack
-    from ..maze import ExtendedMaze, ExtraCellInfo
+    from ..maze import ExtraCellInfo
     from .utils import Algorithm, Robot, RobotState, SolverAlgorithm
 
     type MinorPriority = Callable[[list[Direction]], Iterable[Direction]]
@@ -473,6 +473,50 @@ DEFAULT_DIJKSTRA_WEIGHTS: dict[RelativeDirection, float] = {
 }
 
 
+def _mark_deadends_flood(
+        maze: ExtendedMaze,
+        unknown_groups: Iterable[Set[tuple[int, int]]],
+        goals: Set[tuple[int, int]],
+        color: tuple[int, int, int] | str | None = 'yellow',
+) -> None:
+    """Mark deadends based on flood-fill weights and set their color.
+
+    Args:
+        maze (ExtendedMaze): The maze.
+        pos (tuple[int, int]): The robot's current position.
+        start (tuple[int, int]): The robot's starting point.
+        goals (Set[tuple[int, int]]): The goals.
+        color (tuple[int, int, int] | str | None, optional): The color to mark with. Defaults to 'yellow'.
+    """
+    # Clone the maze to avoid polluting the original maze's caches
+    tmp_maze = ExtendedMaze.full_from_maze(maze)
+    # print(tmp_maze.render_extra(pos=pos + (Direction.NORTH_EAST,), goals=goals, weights=False))
+
+    # Calculate the unbiased flood-fill weights.
+    calc_flood_fill(tmp_maze, goals)
+
+    def _check_group(group: Set[tuple[int, int]]) -> bool:
+        for cell in group:
+            cell_info: ExtraCellInfo = tmp_maze.extra_info[cell]
+            assert cell_info.weight is not None
+            for adj in adjacent_cells(maze, [cell], group):
+                adj_info: ExtraCellInfo = tmp_maze.extra_info[adj]
+                assert adj_info.weight is not None
+                if cell_info.weight <= adj_info.weight:
+                    return False
+        return True
+
+    for unknown in unknown_groups:
+        # Skip the goals
+        if unknown & goals:
+            continue
+        if _check_group(unknown):
+            for cell in unknown:
+                info: ExtraCellInfo = maze.extra_info[cell]
+                info.visited = 1
+                info.color = color
+
+
 def _calc_unknown_groups(  # pylint: disable=too-many-arguments
         maze: ExtendedMaze,
         pos: tuple[int, int],
@@ -513,6 +557,9 @@ def _calc_unknown_groups(  # pylint: disable=too-many-arguments
         else:
             info.reset_color_if(unknown_color)
             info.visited = 1
+
+    _mark_deadends_flood(maze, groups.iter_sets(), goals, deadend_color)
+
     return groups, reduce(or_, groups.iter_sets(), set())
 
 
