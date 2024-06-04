@@ -478,7 +478,7 @@ def _mark_deadends_flood(
         unknown_groups: Iterable[Set[tuple[int, int]]],
         goals: Set[tuple[int, int]],
         color: tuple[int, int, int] | str | None = 'yellow',
-) -> None:
+) -> list[set[tuple[int, int]]]:
     """Mark deadends based on flood-fill weights and set their color.
 
     Args:
@@ -487,6 +487,9 @@ def _mark_deadends_flood(
         start (tuple[int, int]): The robot's starting point.
         goals (Set[tuple[int, int]]): The goals.
         color (tuple[int, int, int] | str | None, optional): The color to mark with. Defaults to 'yellow'.
+
+    Returns:
+        list[set[tuple[int, int]]]: A list containing the groups of dead-ends.
     """
     # Clone the maze to avoid polluting the original maze's caches
     tmp_maze = ExtendedMaze.full_from_maze(maze)
@@ -506,7 +509,9 @@ def _mark_deadends_flood(
                     return False
         return True
 
+    dead_ends_groups: list[set[tuple[int, int]]] = []
     for unknown in unknown_groups:
+        dead_end_group: set[tuple[int, int]] = set()
         # Skip the goals
         if unknown & goals:
             continue
@@ -515,6 +520,11 @@ def _mark_deadends_flood(
                 info: ExtraCellInfo = maze.extra_info[cell]
                 info.visited = 1
                 info.color = color
+                dead_end_group.add(cell)
+
+            dead_ends_groups.append(dead_end_group)
+
+    return dead_ends_groups
 
 
 def _calc_unknown_groups(  # pylint: disable=too-many-arguments
@@ -524,7 +534,7 @@ def _calc_unknown_groups(  # pylint: disable=too-many-arguments
         goals: Set[tuple[int, int]],
         unknown_color: tuple[int, int, int] | str | None = 'blue',
         deadend_color: tuple[int, int, int] | str | None = 'orange',
-) -> tuple[UnionFind[tuple[int, int]], set[tuple[int, int]]]:
+) -> tuple[UnionFind[tuple[int, int]], set[tuple[int, int]], list[set[tuple[int, int]]]]:
     def in_goal(*cells: tuple[int, int]) -> bool:
         return all(cell in goals for cell in cells)
 
@@ -558,12 +568,12 @@ def _calc_unknown_groups(  # pylint: disable=too-many-arguments
             info.reset_color_if(unknown_color)
             info.visited = 1
 
-    _mark_deadends_flood(maze, groups.iter_sets(), goals, deadend_color)
+    return groups, \
+        reduce(or_, groups.iter_sets(), set()), \
+        _mark_deadends_flood(maze, groups.iter_sets(), goals, deadend_color)
 
-    return groups, reduce(or_, groups.iter_sets(), set())
 
-
-def flood_fill_thorough_explorer(  # pylint: disable=too-many-branches,too-many-statements
+def flood_fill_thorough_explorer(  # pylint: disable=too-many-branches,too-many-statements,too-many-locals
         maze: ExtendedMaze,
         goals: Set[tuple[int, int]],
         *,
@@ -599,6 +609,7 @@ def flood_fill_thorough_explorer(  # pylint: disable=too-many-branches,too-many-
     )
     assert next(flood_bot, None) is Action.READY
     pos = yield Action.READY
+    start_pos = pos
     start = pos[:-1]
     while True:
         try:
@@ -608,12 +619,51 @@ def flood_fill_thorough_explorer(  # pylint: disable=too-many-branches,too-many-
         mark_deadends(maze, pos[:-1], start, goals, 'orange')
 
     print(f"flood hunter: found goals! {start=}, {maze.explored_cells_percentage()=:.02%}/{percentage=:.02%}")
+    dead_ends_groups: list[set[tuple[int, int]]] = []
     while maze.explored_cells_percentage() < percentage:
         print(f"flood hunter: pos={tuple(pos)}, {maze.explored_cells_percentage()=:.02%}/{percentage=:.02%}")
         # print(_render_maze(maze, goals=goals, pos=pos))
         mark_unreachable_groups(maze, pos[:-1])
 
-        unknown, all_unknown = _calc_unknown_groups(maze, pos[:-1], start, goals)
+        unknown_color = 'blue'
+        unknown, all_unknown, flood_dead_ends = _calc_unknown_groups(maze, pos[:-1], start, goals, unknown_color=unknown_color)
+        dead_ends_groups += flood_dead_ends
+
+        # Check that the fastest path does not go through a dead-end
+        fastest_routes = dijkstra(
+            build_weighted_graph(
+                maze,
+                DEFAULT_DIJKSTRA_WEIGHTS,
+                start=start_pos,
+            ),
+            src=start,
+            goals=goals,
+        )
+
+        fastest_path = set(min(  # there is at least 1 route
+            (fastest_routes.get(goal, (math.inf, [])) for goal in goals),
+            key=lambda weight_route: (weight_route[0], len(weight_route[1])),
+        )[1])
+
+        to_remove: list[int] = []
+        for i, dead_end_group in enumerate(dead_ends_groups):
+            if fastest_path & dead_end_group:
+                first_time = True
+                for cell in dead_end_group:
+                    info: ExtraCellInfo = maze.extra_info[cell]
+                    info.visited = 0
+                    info.color = unknown_color
+                    all_unknown.add(cell)
+                    if first_time:
+                        dead_end_union_group = unknown.find(cell)
+                        first_time = False
+                    else:
+                        unknown.union(dead_end_union_group, cell)
+
+                to_remove.append(i)
+
+        for i in reversed(to_remove):
+            dead_ends_groups.pop(i)
 
         routes = dijkstra(
             build_weighted_graph(maze, DEFAULT_DIJKSTRA_WEIGHTS, start=pos),
@@ -659,7 +709,8 @@ def flood_fill_thorough_explorer(  # pylint: disable=too-many-branches,too-many-
             except StopIteration:
                 print(f"flood hunter: reached dest - {pos=}")
                 break
-            _, all_unknown = _calc_unknown_groups(maze, pos[:-1], start, goals)
+            _, all_unknown, flood_dead_ends = _calc_unknown_groups(maze, pos[:-1], start, goals, unknown_color=unknown_color)
+            dead_ends_groups += flood_dead_ends
         maze.extra_info[dest].reset_color_if('green')
 
     print(f"flood hunter: done exploring - {maze.explored_cells_percentage()=:.02%}/{percentage=:.02%}")
