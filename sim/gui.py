@@ -14,6 +14,7 @@ from typing import Iterable, NamedTuple, Self
 from .directions import Direction, RelativeDirection
 from .maze import ExtraCellInfo, ExtendedMaze, Maze, Walls
 from .robots import (
+    ROBOTS,
     basic_weighted_flood_fill,
     idle_robot,
     random_robot,
@@ -29,17 +30,6 @@ environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 import pygame as pg  # pylint: disable=wrong-import-order,wrong-import-position
 import pygame_gui    # pylint: disable=wrong-import-order,wrong-import-position
 # autopep8: on
-
-
-ROBOTS = {
-    'Idle': idle_robot,
-    'Random': random_robot,
-    'Left Wall Follower': wall_follower_robot(RelativeDirection.LEFT),
-    'Right Wall Follower': wall_follower_robot(RelativeDirection.RIGHT),
-    'Flood Fill': simple_flood_fill,
-    'Flood Fill -> Dijkstra': basic_weighted_flood_fill,
-    'Thourough Flood Fill': thorough_flood_fill,
-}
 
 
 class Position(NamedTuple):

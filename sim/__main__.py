@@ -14,7 +14,7 @@ from typing import TypedDict, TYPE_CHECKING
 from .directions import Direction
 from .maze import Maze
 from .gui import GUIRenderer  # TODO: change this to use the entrypoints syntax
-from .robots import idle_robot
+from .robots import idle_robot, load_robots
 from .robots.utils import walls_to_directions
 from .simulator import Simulator
 
@@ -262,6 +262,8 @@ def main():
         args.goals = {(args.maze.height - 1, args.maze.width - 1)}
     if args.start_direction is None:
         args.start_direction = (walls_to_directions(args.maze[args.start_pos]) or [Direction.NORTH])[0]
+
+    load_robots()
 
     print(args)
 
