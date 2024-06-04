@@ -52,6 +52,9 @@ micromouse = "sim.__main__:main"
 [project.gui-scripts]
 sim = "sim.gui:_main [gui]"
 
+[project.entry-points."micromouse.robot"]
+better_random = "sim.robots.random:better_random_robot"
+
 [project.optional-dependencies]
 gui = [
   "pygame==2.5.2",
