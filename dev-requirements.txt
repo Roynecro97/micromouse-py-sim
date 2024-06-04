@@ -6,4 +6,3 @@ pylint>=3.0.3
 pytest>=8.0.2
 pytest-emoji>=0.2.0
 pytest-md>=0.2.0
-rich>=13.7.0
