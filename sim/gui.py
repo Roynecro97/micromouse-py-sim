@@ -13,7 +13,14 @@ from typing import Iterable, NamedTuple, Self
 
 from .directions import Direction, RelativeDirection
 from .maze import ExtraCellInfo, ExtendedMaze, Maze, Walls
-from .robots import basic_weighted_flood_fill, idle_robot, random_robot, simple_flood_fill, thorough_flood_fill, wall_follower_robot
+from .robots import (
+    basic_weighted_flood_fill,
+    idle_robot,
+    random_robot,
+    simple_flood_fill,
+    thorough_flood_fill,
+    wall_follower_robot,
+)
 from .simulator import SimulationStatus, Simulator
 
 # Disable the prompt triggered by importing `pygame`.
