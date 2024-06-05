@@ -494,7 +494,7 @@ def mark_deadends(
                 # Reaching here means this is a deadend, mark it as "explored" (in the original maze!)
                 for cell in connected_group:
                     info: ExtraCellInfo = maze.extra_info[cell]
-                    info.visited = 1
+                    info.visited = max(1, info.visited)
                     info.color = color
                 break  # there can be only one connected group with a specific cell
         # Remove the imaginary wall

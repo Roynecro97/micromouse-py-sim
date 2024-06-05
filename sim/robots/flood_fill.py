@@ -732,6 +732,7 @@ def flood_fill_thorough_explorer(  # pylint: disable=too-many-branches,too-many-
         assert next(return_bot, None) is Action.READY
         pos = yield Action.READY
         while True:
+            maze.extra_info[pos[:-1]].reset_color_if()
             try:
                 pos = yield return_bot.send(pos)
             except StopIteration:
