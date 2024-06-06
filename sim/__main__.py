@@ -8,12 +8,13 @@ import re
 import sys
 
 from collections.abc import Set
+from importlib.metadata import entry_points
 from io import StringIO
 from typing import TypedDict, TYPE_CHECKING
 
 from .directions import Direction
+from .front import Renderer
 from .maze import Maze
-from .gui import GUIRenderer  # TODO: change this to use the entrypoints syntax
 from .robots import idle_robot, load_robots
 from .robots.utils import walls_to_directions
 from .simulator import Simulator
@@ -203,6 +204,26 @@ class LoadPreset(argparse.Action):
         setattr(namespace, self.goal_dest, preset['goals'])
 
 
+def _load_gui_engines() -> dict[str, type[Renderer]]:
+    engines: dict[str, type[Renderer]] = {}
+    for renderer in entry_points(group='micromouse.gui'):
+        try:
+            renderer_class = renderer.load()
+        except (AttributeError, ImportError) as err:
+            print(f"warning: failed to load renderer {renderer.name}: {err}")
+            continue
+        if not issubclass(renderer_class, Renderer):
+            print(f"warning: failed to load renderer {renderer.name}: must inherit from {Renderer.__module__}.{Renderer.__qualname__}")
+            continue
+        if renderer.name in engines:
+            print(
+                f"warning: {renderer.name} from {renderer.module}:{renderer.attr} overrides "
+                f"{engines[renderer.name].__module__}:{engines[renderer.name].__qualname__}"
+            )
+        engines[renderer.name] = renderer_class
+    return engines
+
+
 def main():
     """
     The main entrypoint for the simulation, loads a simulation based on
@@ -256,6 +277,13 @@ def main():
         presets_file='mazes/presets.json',
         help="A maze+start+goals preset to load.",
     )
+    gui_engines = _load_gui_engines()
+    sim.add_argument(
+        '-e', '--engine',
+        choices=gui_engines,
+        default='default',
+        help="The render engine to use. (default: a simple pygame GUI renderer, requires the 'gui' feature)",
+    )
 
     args = parser.parse_args()
     if args.goals is None:
@@ -291,7 +319,7 @@ def main():
         print("no maze")
         sys.exit(1)
 
-    GUIRenderer(Simulator(
+    gui_engines[args.engine](Simulator(
         alg=idle_robot,
         maze=args.maze,
         begin=args.start_pos + (args.start_direction,),

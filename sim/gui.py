@@ -12,6 +12,7 @@ from os import environ
 from typing import Iterable, NamedTuple, Self
 
 from .directions import Direction, RelativeDirection
+from .front import Renderer
 from .maze import ExtraCellInfo, ExtendedMaze, Maze, Walls
 from .robots import (
     ROBOTS,
@@ -43,7 +44,7 @@ class Position(NamedTuple):
         return type(self)(self.row + other.row, self.col + other.col)
 
 
-class GUIRenderer:  # pylint: disable=too-many-instance-attributes
+class GUIRenderer(Renderer):  # pylint: disable=too-many-instance-attributes
     """Class for rendering the GUI on screen"""
 
     def __init__(self, sim: Simulator):
@@ -52,6 +53,8 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
         Args:
             sim (Simulator): The simulation to show.
         """
+        super().__init__(sim)
+
         pg.init()
         initial_screen_size = (1280, 720)
         screen = pg.display.set_mode(initial_screen_size, pg.RESIZABLE)
@@ -108,7 +111,6 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
         )
 
         self.sim_auto_step = True
-        self.sim = sim
 
         self.screen_width, self.screen_height = initial_screen_size
         self.text_size = 4 * min(self.screen_width, self.screen_height) // 100
@@ -550,9 +552,9 @@ class GUIRenderer:  # pylint: disable=too-many-instance-attributes
 def _main():
     sim = Simulator(
         alg=idle_robot,
-        maze=Maze.from_file('mazes/simple.maze'),
-        begin=(0, 0, Direction.SOUTH),
-        end={(1, 2)},
+        maze=Maze.from_file('mazes/semifinal_2010.maze'),
+        begin=(15, 0, Direction.EAST),
+        end={(7, 7), (7, 8), (8, 7), (8, 8)},
     )
 
     GUIRenderer(sim).run()
