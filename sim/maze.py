@@ -67,6 +67,33 @@ class Walls(Flag):
         """Return a wall specification for all possible walls."""
         return ~cls.none()
 
+    def rotate_right(self, n: int = 1) -> Self:
+        """Rotate the walls, ``n`` 90-degree turns to the right.
+
+        Args:
+            n (int, optional): The amount of 90-degree turns. Defaults to 1.
+
+        Returns:
+            Walls: The rotated walls.
+        """
+        n &= 0x3  # n %= 4  <- 4-bit rotate is noop
+        shifted = self.value << n
+        assert shifted <= 0x7F
+        hi = shifted & 0xF0
+        lo = shifted & 0x0F
+        return type(self)(lo | (hi >> 4))
+
+    def rotate_left(self, n: int = 1) -> Self:
+        """Rotate the walls, ``n`` 90-degree turns to the left.
+
+        Args:
+            n (int, optional): The amount of 90-degree turns. Defaults to 1.
+
+        Returns:
+            Walls: The rotated walls.
+        """
+        return self.rotate_right(4 - (n & 0x3))  # ``n`` bits to the left == ``-(n % 4)`` bits to the right
+
 
 class LineDirection(Flag):
     """Direction for the lines in the borders of a maze."""
