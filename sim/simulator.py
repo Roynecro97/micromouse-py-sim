@@ -174,7 +174,7 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
         print(f"sim: restarting with a {self.maze.height}x{self.maze.width} maze")
         print(f"sim: robot will start at {self._begin[:-1]} facing {self._begin[-1]}")
         self._maze.reset_info()
-        self._robot_maze = ExtendedMaze.empty(self._maze.height, self.maze.width)
+        self._robot_maze = ExtendedMaze.empty(self.maze.height, self.maze.width)
         self._robot_pos = self._begin
 
         self._robot = alg(self._robot_maze, self._end)

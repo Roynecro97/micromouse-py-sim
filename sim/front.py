@@ -1,4 +1,17 @@
-"""Utilities for using frontends this package.
+"""Utilities for implementing plugins for this package.
+
+Classes:
+* Renderer - base class for "micromouse.gui" entrypoints.
+* Tool - base class for "micromouse.tool" entrypoints.
+* ParserArgs - Typing utility for ``Tool.PARSER_ARGS``.
+* LoadPreset - ``argparse`` action for loading a maze+start+goal preset.
+
+Functions:
+* maze - ``argparse`` type for loading a maze from a path or big string argument.
+* size - ``argparse`` type for parsing a {height}x{width} size.
+* position - ``argparse`` type for parsing a ({row}, {col}) coordinate.
+* position_set - ``argparse`` type for parsing semicolon (':') separated ({row}, {col}) coordinates.
+* direction - ``argparse`` type for parsing a north/east/south/west direction.
 """
 from __future__ import annotations
 
@@ -31,6 +44,49 @@ class Renderer(ABC):  # pylint: disable=too-few-public-methods
     @abstractmethod
     def run(self) -> None:
         """Start the renderer."""
+        raise NotImplementedError
+
+
+class ParserArgs(TypedDict, total=False):
+    """Additional extra arguments for creating a parser."""
+    aliases: Sequence[str]
+    usage: str | None
+    description: str | None
+    epilog: str | None
+    formatter_class: argparse._FormatterClass
+    prefix_chars: str
+    fromfile_prefix_chars: str | None
+    conflict_handler: str
+    add_help: bool
+    allow_abbrev: bool
+
+
+class Tool(ABC):
+    """Base tool class for tools that use the 'micromouse.tool' entrypoint."""
+
+    PARSER_ARGS: ParserArgs = {}
+
+    @classmethod
+    @abstractmethod
+    def build_parser(cls, parser: argparse.ArgumentParser) -> None:
+        """
+        Populate the sub-parser for this tool with arguments.
+        The parser's ``help`` is populated from the class's docstring if it is not empty,
+        or with a default string if it is.
+
+        Args:
+            parser (argparse.ArgumentParser): The parser to populate.
+        """
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def main(cls, args: argparse.Namespace) -> None:
+        """Main entrypoint for the tool.
+
+        Args:
+            args (argparse.Namespace): The parsed commandline arguments.
+        """
         raise NotImplementedError
 
 
@@ -94,8 +150,21 @@ def maze(arg: str) -> Maze:
         raise argparse.ArgumentTypeError(str(error))
 
 
+def size(arg: str) -> tuple[int, int]:
+    """
+    Size type for argparse.
+    A "size" is a tuple of (height, width) coordinates in a "{height}x{width}" format.
+    """
+    if m := re.fullmatch(r'(?P<height>\d+)x(?P<width>\d+)', arg):
+        return (int(m['height']), int(m['width']))
+    raise ValueError
+
+
 def position(arg: str) -> tuple[int, int]:
-    """Position type for argparse. A "position" is a tuple of (row, col) coordinates."""
+    """
+    Position type for argparse.
+    A "position" is a tuple of (row, col) coordinates in a "({row}, {col})" format.
+    """
     if m := re.fullmatch(r'(?P<open>\()?\s*(?P<row>\d+)\s*,\s*(?P<col>\d+)\s*(?(open)\)|)', arg):
         return (int(m['row']), int(m['col']))
     raise ValueError
@@ -189,7 +258,7 @@ class LoadPreset(argparse.Action):
     """An argparse action that loads a maze + starting point + goals preset.
 
     The ``dest`` param should be a comma-separated string with the format of:
-    "{maze_dest},{starting_point_dest},{start_direction_dest}"
+    "{maze_dest},{starting_point_dest},{start_direction_dest},{goals}"
     (additional whitespaces are allowed)
     """
 
