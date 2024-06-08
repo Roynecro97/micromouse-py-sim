@@ -21,29 +21,34 @@ from .robots import idle_robot, load_robots
 from .robots.utils import walls_to_directions
 from .simulator import Simulator
 
+__ENGINE_ENTRYPOINT = 'micromouse.gui'
 
-def __load_gui_engines() -> dict[str, type[Renderer]]:
-    engines: dict[str, type[Renderer]] = {}
-    for renderer in entry_points(group='micromouse.gui'):
+
+def __load_gui_engine(name: str) -> type[Renderer]:
+    engine: type[Renderer] | None = None
+    for renderer in entry_points(group=__ENGINE_ENTRYPOINT, name=name):
         try:
             renderer_class = renderer.load()
         except (AttributeError, ImportError) as err:
-            print(f"warning: failed to load renderer {renderer.name}: {err}", file=sys.stderr)
+            print(f"warning: failed to load renderer {renderer.name!r}: {err}", file=sys.stderr)
             continue
         if not issubclass(renderer_class, Renderer):
             print(
-                f"warning: failed to load renderer {renderer.name}: must inherit from {Renderer.__module__}.{Renderer.__qualname__}",
+                f"warning: failed to load renderer {renderer.name!r}: must inherit from {Renderer.__module__}.{Renderer.__qualname__}",
                 file=sys.stderr,
             )
             continue
-        if renderer.name in engines:
+        if engine is not None:
             print(
-                f"warning: {renderer.name} from {renderer.module}:{renderer.attr} overrides "
-                f"{engines[renderer.name].__module__}:{engines[renderer.name].__qualname__}",
+                f"warning: {renderer.name!r} from {renderer.module}:{renderer.attr} overrides "
+                f"{engine.__module__}:{engine.__qualname__}",
                 file=sys.stderr,
             )
-        engines[renderer.name] = renderer_class
-    return engines
+        engine = renderer_class
+    if engine is None:
+        print(f"error: no valid renderer for {name!r}", file=sys.stderr)
+        sys.exit(1)
+    return engine
 
 
 def __build_tool_parser(main_parser: argparse.ArgumentParser) -> None:
@@ -150,11 +155,11 @@ def main():
         presets_file='mazes/presets.json',
         help="A maze+start+goals preset to load.",
     )
-    gui_engines = __load_gui_engines()
+    assert any(ep.name == 'default' for ep in entry_points(group=__ENGINE_ENTRYPOINT)), "missing default entrypoint"
     sim.add_argument(
         '-e', '--engine',
-        choices=gui_engines,
-        default='default',
+        choices={ep.name for ep in entry_points(group=__ENGINE_ENTRYPOINT)},
+        default='default',  # 'default' comes from this package
         help="The render engine to use. (default: a simple pygame GUI renderer, requires the 'gui' feature)",
     )
 
@@ -188,7 +193,7 @@ def main():
                 print("no maze")
                 sys.exit(1)
 
-            gui_engines[args.engine](Simulator(
+            __load_gui_engine(args.engine)(Simulator(
                 alg=idle_robot,
                 maze=args.maze,
                 begin=args.start_pos + (args.start_direction,),
