@@ -174,7 +174,7 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
         print(f"sim: restarting with a {self.maze.height}x{self.maze.width} maze")
         print(f"sim: robot will start at {self._begin[:-1]} facing {self._begin[-1]}")
         self._maze.reset_info()
-        self._robot_maze = ExtendedMaze.empty(self._maze.height, self.maze.width)
+        self._robot_maze = ExtendedMaze.empty(self.maze.height, self.maze.width)
         self._robot_pos = self._begin
 
         self._robot = alg(self._robot_maze, self._end)
@@ -232,6 +232,7 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
             case Action.RESET:
                 print("sim: robot asked for reset")
                 if self._robot_pos[:-1] != self._begin[:-1] or self._status is not SimulationStatus.IN_PROGRESS_FOUND_DEST:
+                    self._status = SimulationStatus.ERROR
                     raise RuntimeError("reset must be done from the starting position and after finding the goal")
                 self._maze.reset_info()
                 self._robot_pos = self._begin

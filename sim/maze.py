@@ -67,6 +67,75 @@ class Walls(Flag):
         """Return a wall specification for all possible walls."""
         return ~cls.none()
 
+    def rotate_right(self, n: int = 1) -> Self:
+        """Rotate the walls, ``n`` 90-degree turns to the right.
+
+        Args:
+            n (int, optional): The amount of 90-degree turns. Defaults to 1.
+
+        Returns:
+            Walls: The rotated walls.
+        """
+        n &= 0x3  # n %= 4  <- 4-bit rotate is noop
+        shifted = self.value << n
+        assert shifted <= 0x7F
+        hi = shifted & 0xF0
+        lo = shifted & 0x0F
+        return type(self)(lo | (hi >> 4))
+
+    def rotate_left(self, n: int = 1) -> Self:
+        """Rotate the walls, ``n`` 90-degree turns to the left.
+
+        Args:
+            n (int, optional): The amount of 90-degree turns. Defaults to 1.
+
+        Returns:
+            Walls: The rotated walls.
+        """
+        return self.rotate_right(4 - (n & 0x3))  # ``n`` bits to the left == ``-(n % 4)`` bits to the right
+
+    def transpose(self) -> Self:
+        """Transpose the wall spec. (Swap: N <-> W, S <-> E)
+
+        Returns:
+            Self: The transposed walls.
+        """
+        nw = (self & Walls.NORTH).value ^ ((self & Walls.WEST).value >> 3)
+        se = ((self & Walls.SOUTH).value >> 2) ^ ((self & Walls.EAST).value >> 1)
+        mask = Walls((nw << 3) | (se << 2) | (se << 1) | nw)
+        return self ^ mask
+
+    def secondary_transpose(self) -> Self:
+        """Transpose the wall spec along the secondary axis. (Swap: N <-> E, S <-> W)
+
+        Returns:
+            Self: The transposed walls.
+        """
+        ne = (self & Walls.NORTH).value ^ ((self & Walls.EAST).value >> 1)
+        sw = ((self & Walls.SOUTH).value >> 2) ^ ((self & Walls.WEST).value >> 3)
+        mask = Walls((sw << 3) | (sw << 2) | (ne << 1) | ne)
+        return self ^ mask
+
+    def flip_horizontally(self) -> Self:
+        """Invert the wall spec horizontally. (Swap: E <-> W)
+
+        Returns:
+            Self: The inverted walls.
+        """
+        ew = ((self & Walls.EAST).value >> 1) ^ ((self & Walls.WEST).value >> 3)
+        mask = Walls((ew << 3) | (ew << 1))
+        return self ^ mask
+
+    def flip_vertically(self) -> Self:
+        """Invert the wall spec vertically. (Swap: N <-> S)
+
+        Returns:
+            Self: The inverted walls.
+        """
+        ns = (self & Walls.NORTH).value ^ ((self & Walls.SOUTH).value >> 2)
+        mask = Walls((ns << 2) | ns)
+        return self ^ mask
+
 
 class LineDirection(Flag):
     """Direction for the lines in the borders of a maze."""
