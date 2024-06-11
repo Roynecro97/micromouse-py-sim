@@ -551,6 +551,16 @@ class GUIRenderer(Renderer):  # pylint: disable=too-many-instance-attributes
                 self.text_size,
                 Position(middle_width + 7 * self.tile_size, 2 * self.text_size),
             )
+            self.draw_text(
+                f'Explored Cells: {self.sim.maze.explored_cells_count()}',
+                self.text_size,
+                Position(self.tile_size, self.full_maze_offset.col + self.sim.maze.height * (self.tile_size + 1)),
+            )
+            self.draw_text(
+                f'Explored Cells Percentage: {self.sim.maze.explored_cells_percentage():.3%}',
+                self.text_size,
+                Position(self.robot_maze_offset.row, self.full_maze_offset.col + self.sim.maze.height * (self.tile_size + 1)),
+            )
 
             self.update(time_delta)
 

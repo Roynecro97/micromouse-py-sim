@@ -490,7 +490,7 @@ def mark_deadends(
             for connected_group in iter(connectivity.iter_sets()):
                 if checked_cell not in connected_group:
                     continue
-                print("deadend:", connected_group)
+                # print("deadend:", connected_group)
                 # Reaching here means this is a deadend, mark it as "explored" (in the original maze!)
                 for cell in connected_group:
                     info: ExtraCellInfo = maze.extra_info[cell]
