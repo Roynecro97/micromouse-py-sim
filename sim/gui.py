@@ -11,6 +11,8 @@ from datetime import datetime, timedelta
 from os import environ
 from typing import Iterable, NamedTuple, Self
 
+import rich
+
 from .directions import Direction, RelativeDirection
 from .front import Renderer
 from .maze import ExtraCellInfo, ExtendedMaze, Maze, Walls
@@ -416,7 +418,7 @@ class GUIRenderer(Renderer):  # pylint: disable=too-many-instance-attributes
         # self.maze_dropdown.set_position((5 * self.text_size, 0))
         # self.maze_dropdown.set_dimensions((4 * self.tile_size, self.tile_size))
         self.robot_dropdown.set_position((6 * self.text_size, 0.5 * self.text_size))
-        self.robot_dropdown.set_dimensions((10 * self.text_size, 1.5 * self.text_size))
+        self.robot_dropdown.set_dimensions((12 * self.text_size, 1.5 * self.text_size))
 
     def main_loop(self):  # pylint: disable=too-many-locals
         """Main GUI loop. This function will stay in a loop until exit."""
@@ -448,7 +450,11 @@ class GUIRenderer(Renderer):  # pylint: disable=too-many-instance-attributes
                 step = False
 
             if step and self.sim_auto_step:
-                self.sim.step()
+                try:
+                    self.sim.step()
+                except RuntimeError:
+                    rich.get_console().print_exception(show_locals=True)
+
                 last_step = now
                 print(f"GUI: after step - {self.sim.maze[self.sim.robot_pos[:-1]]=} {self.sim.robot_maze[self.sim.robot_pos[:-1]]=}")
 
@@ -544,6 +550,16 @@ class GUIRenderer(Renderer):  # pylint: disable=too-many-instance-attributes
                 f'Simulation Delay [s]: {self.sim_speed_slider.get_current_value():.3f}',
                 self.text_size,
                 Position(middle_width + 7 * self.tile_size, 2 * self.text_size),
+            )
+            self.draw_text(
+                f'Explored Cells: {self.sim.maze.explored_cells_count()}',
+                self.text_size,
+                Position(self.tile_size, self.full_maze_offset.col + self.sim.maze.height * (self.tile_size + 1)),
+            )
+            self.draw_text(
+                f'Explored Cells Percentage: {self.sim.maze.explored_cells_percentage():.3%}',
+                self.text_size,
+                Position(self.robot_maze_offset.row, self.full_maze_offset.col + self.sim.maze.height * (self.tile_size + 1)),
             )
 
             self.update(time_delta)

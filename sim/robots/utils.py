@@ -483,17 +483,20 @@ def mark_deadends(
         # print(tmp_maze.render_extra(pos=pos + (Direction.NORTH_EAST,), goals=goals, weights=False))
         # Check connectivity
         connectivity = tmp_maze.connectivity
-        pos_group = connectivity.find(pos)
-        if all(pos_group == connectivity.find(goal) for goal in goals):
+        checked_cell = direction_to_cell(pos, _wall_to_direction(missing))
+        # Make sure we didn't separate the current position from the goals/start and that the wall
+        # disconnected a part of the maze -> dead end.
+        if all(connectivity.connected(pos, goal) for goal in goals) and not connectivity.connected(pos, checked_cell):
             for connected_group in iter(connectivity.iter_sets()):
-                if pos in connected_group:
+                if checked_cell not in connected_group:
                     continue
                 # print("deadend:", connected_group)
                 # Reaching here means this is a deadend, mark it as "explored" (in the original maze!)
                 for cell in connected_group:
                     info: ExtraCellInfo = maze.extra_info[cell]
-                    info.visited = 1
+                    info.visited = max(1, info.visited)
                     info.color = color
+                break  # there can be only one connected group with a specific cell
         # Remove the imaginary wall
         tmp_maze.remove_walls(*pos, missing)
 

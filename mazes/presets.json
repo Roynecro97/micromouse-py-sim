@@ -40,5 +40,11 @@
         "start_pos": [15, 0],
         "start_direction": "east",
         "goals": [[8, 8]]
+    },
+    "japan": {
+        "file": "mazes/japan_2017.maze",
+        "start_pos": [15, 0],
+        "start_direction": "north",
+        "goals": [[7, 7], [7, 8], [8, 7], [8, 8]]
     }
 }
