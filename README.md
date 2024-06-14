@@ -1,5 +1,7 @@
 # Micromouse Python Simulator
 
+[![ci](https://github.com/Roynecro97/micromouse-py-sim/actions/workflows/ci.yml/badge.svg)](https://github.com/Roynecro97/micromouse-py-sim/actions/workflows/ci.yml)
+
 Simulator, algorithms and utilities for the [Micromouse][video] competition.
 
 ## Installation
