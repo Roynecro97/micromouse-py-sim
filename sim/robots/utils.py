@@ -13,7 +13,7 @@ from enum import auto, Enum
 from typing import NamedTuple, overload, TYPE_CHECKING
 
 from ..directions import Direction, RelativeDirection, PRIMARY_DIRECTIONS
-from ..maze import ExtendedMaze, Walls  # TODO: fix this to be the correct type after moving things in Maze
+from ..maze import ExtendedMaze, Walls
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Generator, Set
@@ -27,7 +27,7 @@ ENABLE_VICTORY_DANCE = os.environ.get('MICROMOUSE_VICTORY_DANCE', 'n') == 'y'
 
 
 class Action(Enum):
-    """TODO: docs"""
+    """A valid robot action. Yielded by robots to move around the maze."""
     READY = auto()
     RESET = auto()
     FORWARD = auto()
@@ -50,7 +50,14 @@ class Action(Enum):
 
     @classmethod
     def from_rel_direction(cls, direction: RelativeDirection) -> Action:
-        """Create an action from a relative direction."""
+        """Create an action from a relative direction.
+
+        Args:
+            direction (RelativeDirection): A relative direction.
+
+        Returns:
+            Action: The corresponding action.
+        """
         match direction:
             case RelativeDirection.FRONT: return cls.FORWARD
             case RelativeDirection.BACK: return cls.BACKWARDS
@@ -62,7 +69,17 @@ def turns_for_rel_direction(
     direction: RelativeDirection,
     follow: Literal[RelativeDirection.LEFT, RelativeDirection.RIGHT] = RelativeDirection.LEFT,
 ) -> list[Literal[Action.TURN_LEFT, Action.TURN_RIGHT]]:
-    """Create the turns needed to face in a relative direction."""
+    """Create the turns needed to face in a relative direction.
+
+    Args:
+        direction (RelativeDirection): A relative direction.
+        follow (Literal[RelativeDirection.LEFT, RelativeDirection.RIGHT], optional):
+            The side to follow when performing a U-turn (to follow the left size, turn right twice).
+            Defaults to RelativeDirection.LEFT.
+
+    Returns:
+        list[Literal[Action.TURN_LEFT, Action.TURN_RIGHT]]: A list of actions to orient the robot to turn to the wanted direction.
+    """
     match direction:
         case RelativeDirection.FRONT: return []
         case RelativeDirection.BACK: return [Action.from_rel_direction(follow.invert())] * 2
@@ -74,7 +91,15 @@ def needed_turns_for_rel_direction(
     direction: RelativeDirection,
     turn_action: Literal[Action.TURN_LEFT, Action.TURN_RIGHT],
 ) -> int:
-    """Get the number of turns needed to face in a relative direction using only one turn type."""
+    """Get the number of turns needed to face in a relative direction using only one turn type.
+
+    Args:
+        direction (RelativeDirection): The direction to face.
+        turn_action (Literal[Action.TURN_LEFT, Action.TURN_RIGHT]): The turn action to use.
+
+    Returns:
+        int: The amount of turns needed.
+    """
     match direction:
         case RelativeDirection.FRONT: return 0
         case RelativeDirection.BACK: return 2
@@ -83,10 +108,7 @@ def needed_turns_for_rel_direction(
 
 
 class RobotState(NamedTuple):
-    """TODO: docs
-
-    Represents the current robot's state
-    """
+    """Represents the current robot's state: position + heading."""
     row: int
     col: int
     heading: Direction
@@ -115,12 +137,29 @@ def _wall_to_direction(wall: Walls) -> Direction:
 
 
 def walls_to_directions(walls: Walls) -> list[Direction]:
-    """TODO: docs (converts a cell's wall spec into a sorted list of available directions)"""
+    """Convert a cell's wall spec into a sorted list of available directions.
+
+    Args:
+        walls (Walls): A wall specification.
+
+    Returns:
+        list[Direction]: A list of directions that don't have walls blocking them.
+    """
     return sorted(_wall_to_direction(missing_wall) for missing_wall in ~walls)
 
 
 def direction_to_wall(direction: Direction) -> Walls:
-    """TODO: docs (converts a direction spec into a wall)"""
+    """Converts a direction spec into a wall spec.
+
+    Args:
+        direction (Direction): The direction to convert.
+
+    Raises:
+        ValueError: There is no corresponding wall.
+
+    Returns:
+        Walls: A wall at the provided direction.
+    """
     match direction:
         case Direction.NORTH: return Walls.NORTH
         case Direction.EAST: return Walls.EAST
@@ -233,7 +272,19 @@ def cell_to_direction(  # pylint: disable=too-many-return-statements
 
 
 def abs_turn_to_actions(before: Direction, after: Direction, allow_reverse: bool = True) -> list[Action]:
-    """Actions required to get from a cell, facing ``before`` to the cell at the ``after`` direction."""
+    """Calculate the ``Action``s required to get from a cell, facing ``before`` to the cell at the ``after`` direction.
+
+    Args:
+        before (Direction): Original heading.
+        after (Direction): Cardinal direction pointing to the desired cell.
+        allow_reverse (bool, optional): Allow using ``Action.BACKWARDS``. Defaults to True.
+
+    Raises:
+        ValueError: Unsupported turn (no possible action set can perform the turn).
+
+    Returns:
+        list[Action]: The required actions, always ends with either ``Action.FORWARD`` or ``Action.BACKWARDS``.
+    """
     if before == after:
         return [Action.FORWARD]
     if before.turn_back() == after:
@@ -246,7 +297,19 @@ def abs_turn_to_actions(before: Direction, after: Direction, allow_reverse: bool
 
 
 def abs_turn_to_rel(before: Direction, after: Direction) -> RelativeDirection:
-    """Relative direction to get from a facing ``before`` to facing ``after`` direction."""
+    """Calculate the relative direction to get from a facing ``before`` to facing ``after`` direction.
+
+    Args:
+        before (Direction): Original heading.
+        after (Direction): Desired heading.
+
+    Raises:
+        ValueError: Turn is impossible.
+
+    Returns:
+        RelativeDirection: The relative direction that when provided as the parameter for
+            ``before.turn(...)`` causes the function to return ``after``.
+    """
     if before == after:
         return RelativeDirection.FRONT
     if before.turn_back() == after:
@@ -282,7 +345,17 @@ def build_weighted_graph(
         without: Set[Vertex] = frozenset(),
         start: tuple[int, int, Direction] | None = None,
 ) -> WeightedGraph:
-    """Build a graph from"""
+    """Build a graph from a maze (for dijkstra and other similar calculations).
+
+    Args:
+        maze (Maze): The maze.
+        weights (dict[RelativeDirection, float] | Callable[[RelativeDirection], float]): Weights for different turns.
+        without (Set[Vertex], optional): Cells or Vertices to exclude from the graph. Defaults to frozenset().
+        start (tuple[int, int, Direction] | None, optional): A starting position to add to the graph. Defaults to None.
+
+    Returns:
+        WeightedGraph: A weighted graph for path calculations.
+    """
     # if order <= 0:
     #     raise ValueError(f"order must be positive: {order}")
     # assert order == 1, "Higher orders not yet supported"

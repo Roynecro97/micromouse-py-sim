@@ -28,6 +28,10 @@ def _wall_follower_robot(
 ) -> Robot:
     """A robot that follows the wall.
 
+    Args:
+        maze (Maze): The maze.
+        goals (Set[tuple[int, int]]): The goal cells.
+
     Returns:
         Robot: The robot's brain.
     """
@@ -71,7 +75,7 @@ def wall_follower_robot(follow: Literal[RelativeDirection.LEFT, RelativeDirectio
     """A robot that follows the wall.
 
     Returns:
-        Robot: The robot's brain.
+        Algorithm: The robot's algorithm.
     """
     def _inner(maze: Maze, goals: Set[tuple[int, int]]) -> Robot:
         return _wall_follower_robot(maze, goals, follow=follow)

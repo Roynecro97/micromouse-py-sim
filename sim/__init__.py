@@ -1,6 +1,6 @@
-"""Simulate Micromouse
+"""Simulator for the Micromouse competition
 
-TODO: document
+Simulator, algorithms and utilities for the Micromouse competition.
 """
 
 from . import maze, simulator, robots, unionfind

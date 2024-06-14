@@ -1,6 +1,6 @@
-"""predetermined robot
+"""predetermined robots
 
-Moves according to a predetermined path.
+Move according to a predetermined path.
 """
 
 from __future__ import annotations
@@ -29,7 +29,12 @@ def predetermined_action_robot(
         *,
         actions: Iterable[Action],
 ) -> Robot:
-    """A robot that follows predetermined instructions.
+    """A robot that follows a predetermined list of actions.
+
+    Args:
+        maze (Maze): The maze (ignored).
+        goals (Set[tuple[int, int]]): The goal cells (ignored).
+        actions (Iterable[Action]): The actions to perform. This does not need to contain the READY action.
 
     Returns:
         Robot: The robot's brain.
@@ -69,9 +74,13 @@ def predetermined_directions_robot(
         *,
         route: Iterable[Direction],
 ) -> Robot:
-    """A robot that follows predetermined instructions.
+    """A robot that follows a predetermined list of cardinal directions.
 
-    ``route`` must have at least 2 elements. The first is the starting direction.
+    Args:
+        maze (Maze): The maze (ignored).
+        goals (Set[tuple[int, int]]): The goal cells (ignored).
+        route (Iterable[Direction]): The directions to follow. Must have at least 2 elements.
+            The first is the starting direction, the rest mean "move 1 cell in X direction".
 
     Returns:
         Robot: The robot's brain.
@@ -90,9 +99,16 @@ def predetermined_path_robot(
         path: Iterable[tuple[int, int]],
         initial_heading: Direction,
 ) -> Robot:
-    """A robot that follows predetermined instructions.
+    """A robot that follows a predetermined path through the maze.
+    The path is described by cell coordinates and must contain all cells -> every
+    two consecutive cells in the path must be adjacent.
 
-    ``path`` must have at least 2 elements. The first is the starting position.
+    Args:
+        maze (Maze): The maze (ignored).
+        goals (Set[tuple[int, int]]): The goal cells (ignored).
+        path (Iterable[tuple[int, int]]): The path to follow. Must have at least 2 elements.
+            The first cell is the starting position.
+        initial_heading (Direction): The initial heading of the robot.
 
     Returns:
         Robot: The robot's brain.
@@ -126,7 +142,15 @@ def predetermined_robot(*, path: Iterable[tuple[int, int]], initial_heading: Dir
 def predetermined_robot(**direction_args: Unpack[PathingArgs]) -> Algorithm:
     """A robot that follows predetermined instructions.
 
-    ``path`` must have at least 2 elements. The first is the starting position.
+    Args
+        actions (Iterable[Action]): Create a ``predetermined_action_robot()``. If provided, no other argument can be passed.
+        route (Iterable[Direction]): Create a ``predetermined_directions_robot()``. If provided, no other argument can be passed.
+        path (Iterable[tuple[int, int]]): Create a ``predetermined_path_robot()``. If provided, only the ``initial_heading`` argument
+            can (and must) be passed.
+        initial_heading (Direction): Used with ``path`` to specify the initial heading.
+
+    Raises:
+        TypeError: Invalid argument combination.
 
     Returns:
         Robot: The robot's brain.

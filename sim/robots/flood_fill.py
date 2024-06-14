@@ -179,6 +179,14 @@ def single_flood_fill(  # pylint: disable=too-many-locals
 ) -> Robot:
     """A robot that solves the maze using a simple implementation of the flood-fill algorithm.
 
+    Args:
+        maze (Maze): The maze.
+        goals (Set[tuple[int, int]]): The goal cells.
+        weight (WeightCalc, optional): The weight function. Defaults to simple_flood_weight.
+        minor_priority (MinorPriority, optional):
+            The last priority in selecting cells. Defaults to shuffled.
+        recalculate_flood (bool, optional): Recalculate flood-fill weights every step (if the maze has changed). Defaults to True.
+
     Returns:
         Robot: The robot's brain.
     """
@@ -310,6 +318,10 @@ def flood_fill_robot(  # pylint: disable=too-many-arguments
     def _flood_fill_robot_impl(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robot:
         """A robot that solves the maze using a simple implementation of the flood-fill algorithm.
 
+        Args:
+            maze (Maze): The maze.
+            goals (Set[tuple[int, int]]): The goal cells.
+
         Returns:
             Robot: The robot's brain.
         """
@@ -345,6 +357,10 @@ def flood_fill_robot(  # pylint: disable=too-many-arguments
 def simple_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robot:
     """A robot that solves the maze using a simple implementation of the flood-fill algorithm.
 
+    Args:
+        maze (Maze): The maze.
+        goals (Set[tuple[int, int]]): The goal cells.
+
     Returns:
         Robot: The robot's brain.
     """
@@ -361,6 +377,12 @@ def dijkstra_solver(
     """A robot that solves the maze using dijkstra.
 
     THIS IS A SECOND STEP ROBOT!
+
+    Args:
+        maze (Maze): The maze.
+        goals (Set[tuple[int, int]]): The goal cells.
+        pos (RobotState | None, optional): The robot's current position. Defaults to None.
+        unknown_cells (Set[tuple[int, int]], optional): The cells to avoid. Defaults to frozenset().
 
     Returns:
         Robot: The robot's brain.
@@ -428,6 +450,12 @@ def two_step_robot(
 ) -> Robot:
     """Combines 2 robots: one for exploration and another for finding an optimal path.
 
+    Args:
+        maze (Maze): The maze.
+        goals (Set[tuple[int, int]]): The goal cells.
+        explorer (Algorithm, optional): The robot to use for the exploration phase. Defaults to flood_fill_explore.
+        solver (SolverAlgorithm, optional): The robot to use for the solution phase. Defaults to dijkstra_solver.
+
     Returns:
         Robot: The robot's brain.
     """
@@ -450,6 +478,10 @@ def two_step_robot(
 
 def basic_weighted_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robot:
     """A robot that solves the maze using a simple implementation of the flood-fill algorithm.
+
+    Args:
+        maze (Maze): The maze.
+        goals (Set[tuple[int, int]]): The goal cells.
 
     Returns:
         Robot: The robot's brain.
