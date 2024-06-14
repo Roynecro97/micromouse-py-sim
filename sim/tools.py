@@ -93,13 +93,13 @@ class MazeEditor(Tool):
             '--cell-width',
             type=int,
             default=3,
-            help="The amount of characters between to cell corners horizontally. (default: 3).",
+            help="The amount of characters between cell corners horizontally. (default: 3).",
         )
         render.add_argument(
             '--cell-height',
             type=int,
             default=1,
-            help="The amount of characters between to cell corners vertically. (default: 1).",
+            help="The amount of characters between cell corners vertically. (default: 1).",
         )
         render.add_argument(
             '--no-force-corners',
