@@ -153,7 +153,7 @@ def calc_flood_fill(
         marker += 1
         seen.update(current)
         current = adjacent_cells(maze, current, seen)
-        if len(seen) >= maze.cell_size:
+        if len(seen) >= maze.cell_count:
             break
         if not current:
             unreachable = {(r, c) for r, c, _ in maze} - seen
@@ -162,7 +162,7 @@ def calc_flood_fill(
                 maze.extra_info[cell].weight = UNREACHABLE_WEIGHT
             seen.update(unreachable)
             break  # unreachable cells detected
-    assert len(seen) == maze.cell_size, f"new cells created ({len(seen)}/{maze.cell_size})"
+    assert len(seen) == maze.cell_count, f"new cells created ({len(seen)}/{maze.cell_count})"
 
 
 def _do_nothing() -> None:

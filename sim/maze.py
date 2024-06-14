@@ -572,7 +572,7 @@ class Maze:
         return self._width
 
     @property
-    def cell_size(self) -> int:
+    def cell_count(self) -> int:
         """The amount of cells in the maze."""
         return len(self._cells)
 
@@ -584,8 +584,8 @@ class Maze:
         if row >= self.height or col >= self.width:
             return default
         cell = self._index(row, col)
-        assert cell < self.cell_size, f"bad cell calculation for {self.size=}, ({row=}, {col=}), {cell=}"
-        # if cell >= self.cell_size:
+        assert cell < self.cell_count, f"bad cell calculation for {self.size=}, ({row=}, {col=}), {cell=}"
+        # if cell >= self.cell_count:
         #     return default
         return Walls(self._cells[cell])
 
@@ -881,7 +881,7 @@ class ExtendedMaze(Maze):
         Returns:
             float: The percentage of cells that were visited.
         """
-        return self.explored_cells_count() / self.cell_size
+        return self.explored_cells_count() / self.cell_count
 
     @property
     def connectivity(self) -> UnionFind[tuple[int, int]]:
