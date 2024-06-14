@@ -152,6 +152,7 @@ def main():
         '-p', '--preset',
         action=LoadPreset,
         dest='maze,start_pos,start_direction,goals',
+        metavar='PRESET',
         presets_file='mazes/presets.json',
         help="A maze+start+goals preset to load.",
     )
@@ -174,7 +175,7 @@ def main():
 
     load_robots()
 
-    print(args)
+    # print(args)
 
     match args.main_action:
         case 'sim':

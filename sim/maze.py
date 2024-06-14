@@ -542,10 +542,10 @@ class Maze:
         if fmt is None:
             _, ext = os.path.splitext(maze_file)
             match ext:
-                case 'maz' | b'maz': fmt = 'maz'
-                case 'num' | b'num': fmt = 'num'
-                case 'csv' | b'csv': fmt = 'csv'
-                case 'maze' | b'maze': fmt = 'maze'
+                case '.maz' | b'.maz': fmt = 'maz'
+                case '.num' | b'.num': fmt = 'num'
+                case '.csv' | b'.csv': fmt = 'csv'
+                case '.maze' | b'.maze': fmt = 'maze'
                 case _:
                     # Didn't recognize extension
                     fmt = 'maze'

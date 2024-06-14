@@ -419,7 +419,7 @@ def dijkstra_solver(
     )
 
 
-def _two_step_robot(
+def two_step_robot(
         maze: ExtendedMaze,
         goals: Set[tuple[int, int]],
         *,
@@ -454,7 +454,7 @@ def basic_weighted_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -
     Returns:
         Robot: The robot's brain.
     """
-    return _two_step_robot(
+    return two_step_robot(
         maze,
         goals,
         explorer=partial(
@@ -756,7 +756,7 @@ def thorough_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robo
     Returns:
         Robot: The robot's brain.
     """
-    return _two_step_robot(
+    return two_step_robot(
         maze,
         goals,
         explorer=partial(
