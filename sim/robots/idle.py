@@ -20,6 +20,10 @@ if TYPE_CHECKING:
 def idle_robot(maze: Maze, goals: Set[tuple[int, int]]) -> Robot:
     """A robot with random movements.
 
+    Args:
+        maze (Maze): The maze (ignored).
+        goals (Set[tuple[int, int]]): The goal cells (ignored).
+
     Returns:
         Robot: The robot's brain.
     """

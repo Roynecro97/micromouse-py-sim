@@ -1,6 +1,6 @@
-"""random robot
+"""random robots
 
-Moves to a random cell at every step.
+Move to a random cell at every step.
 """
 
 from __future__ import annotations
@@ -20,6 +20,10 @@ if TYPE_CHECKING:
 
 def random_robot(maze: Maze, goals: Set[tuple[int, int]]) -> Robot:
     """A robot with random movements.
+
+    Args:
+        maze (Maze): The maze.
+        goals (Set[tuple[int, int]]): The goal cells.
 
     Returns:
         Robot: The robot's brain.
@@ -67,6 +71,10 @@ def better_random_robot(maze: Maze, goals: Set[tuple[int, int]]) -> Robot:
     """
     A robot with random movements that will not return to the previous cell unless
     it has to.
+
+    Args:
+        maze (Maze): The maze.
+        goals (Set[tuple[int, int]]): The goal cells.
 
     Returns:
         Robot: The robot's brain.

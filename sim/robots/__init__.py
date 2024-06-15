@@ -4,14 +4,15 @@ Simple:
 + Idle
 + Random
 + Wall Follower (left/right)
-+ Predetermined [TODO]
++ Predetermined
 
 Advanced:
-+ Flood Fill:
-  + Simple - no diagonals, shortest path
-  + Weighted - no diagonals, fastest path by time [TODO]
 + BFS [TODO]
 + DFS [TODO]
++ Flood Fill:
+  + Simple - no diagonals, shortest path
+  + Weighted - no diagonals, fastest path by time
+  + Thorough explorer - no diagonals, explore (almost) the entire maze, fastest path by time
 """
 from __future__ import annotations
 
@@ -88,8 +89,7 @@ def register_robot(name: str, robot: Algorithm | None = None) -> Algorithm | Cal
 
 @cache
 def load_robots() -> None:
-    """Load all robots registered as an entrypoint.
-    """
+    """Load all robots registered as an entrypoint."""
     import re  # pylint: disable=import-outside-toplevel
     from importlib.metadata import entry_points  # pylint: disable=import-outside-toplevel
     from types import ModuleType  # pylint: disable=import-outside-toplevel

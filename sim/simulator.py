@@ -44,7 +44,11 @@ class Counter:
         self._cell = CounterData()
 
     def count_action(self, action: Action) -> None:
-        """Update counters by the robot's action."""
+        """Update counters according to the robot's action.
+
+        Args:
+            action (Action): The robot's action.
+        """
         self._step += 1
         match action:
             case Action.READY:
@@ -105,7 +109,7 @@ class Counter:
 
 
 class SimulationStatus(Enum):
-    """TODO"""
+    """Represents the simulation's status."""
 
     READY = auto()
     IN_PROGRESS = auto()
@@ -116,7 +120,11 @@ class SimulationStatus(Enum):
 
 @contextmanager
 def timed(title: str = ""):
-    """A contextmanager for measuring time (in seconds)."""
+    """A contextmanager for measuring time (in seconds).
+
+    Args:
+        title (str, optional): An optional title to add to the time measurement. Defaults to "".
+    """
     t0 = time.perf_counter()
     try:
         yield
@@ -139,6 +147,19 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
     _counter: Counter
 
     def __init__(self, alg: Algorithm, maze: Maze, begin: tuple[int, int, Direction], end: Iterable[tuple[int, int]]):
+        """Initialize a new simulator.
+
+        Args:
+            alg (Algorithm): The initial robot's algorithm.
+            maze (Maze): The maze for the simulation.
+            begin (tuple[int, int, Direction]): The robot's starting position + heading.
+            end (Iterable[tuple[int, int]]): The goal cells.
+
+        Raises:
+            ValueError: The robot starts facing a wall.
+            ValueError: There are no end cells.
+            ValueError: The goals are not reachable from the starting position.
+        """
         self._maze = ExtendedMaze.full_from_maze(maze)
         self._begin = begin
         self._end = frozenset(end)
@@ -170,7 +191,17 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
         self.restart(alg)
 
     def restart(self, alg: Algorithm):
-        """Restart the simulator."""
+        """Restart the simulator with a new algorithm.
+        The first READY action is consumed in this function.
+
+        Args:
+            alg (Algorithm): The new algorithm to use.
+
+        Raises:
+            RuntimeError: The robot yielded no actions.
+            RuntimeError: The robot encountered an error on init (before yielding READY).
+            RuntimeError: The robot's first action is not READY.
+        """
         print(f"sim: restarting with a {self.maze.height}x{self.maze.width} maze")
         print(f"sim: robot will start at {self._begin[:-1]} facing {self._begin[-1]}")
         self._maze.reset_info()
@@ -194,7 +225,15 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
         self._counter = Counter()
 
     def step(self) -> SimulationStatus:
-        """Perform a single robot action."""
+        """Perform a single robot action.
+
+        Raises:
+            RuntimeError: The robot encountered an error.
+            RuntimeError: The robot performed an illegal action (illegal RESET).
+
+        Returns:
+            SimulationStatus: The status of the simulation after the step.
+        """
         # if self._status not in (SimulationStatus.IN_PROGRESS, SimulationStatus.READY):
         #     # Simulation is not running.
         #     return self._status
@@ -325,7 +364,15 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
         return self._counter
 
     def connected(self, a: tuple[int, int] | Iterable[tuple[int, int]], b: tuple[int, int] | Iterable[tuple[int, int]]) -> bool:
-        """Check if two cells (or cell groups) are connected in the maze."""
+        """Check if two cells (or cell groups) are connected in the maze.
+
+        Args:
+            a (tuple[int, int] | Iterable[tuple[int, int]]): Cell group A.
+            b (tuple[int, int] | Iterable[tuple[int, int]]): Cell group B.
+
+        Returns:
+            bool: True if all cells in group A are connected to all cells in group B.
+        """
         # Calculate connectivity
         connectivity = self._maze.connectivity
 

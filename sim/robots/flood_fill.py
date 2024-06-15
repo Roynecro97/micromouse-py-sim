@@ -153,7 +153,7 @@ def calc_flood_fill(
         marker += 1
         seen.update(current)
         current = adjacent_cells(maze, current, seen)
-        if len(seen) >= maze.cell_size:
+        if len(seen) >= maze.cell_count:
             break
         if not current:
             unreachable = {(r, c) for r, c, _ in maze} - seen
@@ -162,7 +162,7 @@ def calc_flood_fill(
                 maze.extra_info[cell].weight = UNREACHABLE_WEIGHT
             seen.update(unreachable)
             break  # unreachable cells detected
-    assert len(seen) == maze.cell_size, f"new cells created ({len(seen)}/{maze.cell_size})"
+    assert len(seen) == maze.cell_count, f"new cells created ({len(seen)}/{maze.cell_count})"
 
 
 def _do_nothing() -> None:
@@ -178,6 +178,14 @@ def single_flood_fill(  # pylint: disable=too-many-locals
         recalculate_flood: bool = True,
 ) -> Robot:
     """A robot that solves the maze using a simple implementation of the flood-fill algorithm.
+
+    Args:
+        maze (Maze): The maze.
+        goals (Set[tuple[int, int]]): The goal cells.
+        weight (WeightCalc, optional): The weight function. Defaults to simple_flood_weight.
+        minor_priority (MinorPriority, optional):
+            The last priority in selecting cells. Defaults to shuffled.
+        recalculate_flood (bool, optional): Recalculate flood-fill weights every step (if the maze has changed). Defaults to True.
 
     Returns:
         Robot: The robot's brain.
@@ -310,6 +318,10 @@ def flood_fill_robot(  # pylint: disable=too-many-arguments
     def _flood_fill_robot_impl(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robot:
         """A robot that solves the maze using a simple implementation of the flood-fill algorithm.
 
+        Args:
+            maze (Maze): The maze.
+            goals (Set[tuple[int, int]]): The goal cells.
+
         Returns:
             Robot: The robot's brain.
         """
@@ -345,6 +357,10 @@ def flood_fill_robot(  # pylint: disable=too-many-arguments
 def simple_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robot:
     """A robot that solves the maze using a simple implementation of the flood-fill algorithm.
 
+    Args:
+        maze (Maze): The maze.
+        goals (Set[tuple[int, int]]): The goal cells.
+
     Returns:
         Robot: The robot's brain.
     """
@@ -361,6 +377,12 @@ def dijkstra_solver(
     """A robot that solves the maze using dijkstra.
 
     THIS IS A SECOND STEP ROBOT!
+
+    Args:
+        maze (Maze): The maze.
+        goals (Set[tuple[int, int]]): The goal cells.
+        pos (RobotState | None, optional): The robot's current position. Defaults to None.
+        unknown_cells (Set[tuple[int, int]], optional): The cells to avoid. Defaults to frozenset().
 
     Returns:
         Robot: The robot's brain.
@@ -419,7 +441,7 @@ def dijkstra_solver(
     )
 
 
-def _two_step_robot(
+def two_step_robot(
         maze: ExtendedMaze,
         goals: Set[tuple[int, int]],
         *,
@@ -427,6 +449,12 @@ def _two_step_robot(
         solver: SolverAlgorithm = dijkstra_solver,
 ) -> Robot:
     """Combines 2 robots: one for exploration and another for finding an optimal path.
+
+    Args:
+        maze (Maze): The maze.
+        goals (Set[tuple[int, int]]): The goal cells.
+        explorer (Algorithm, optional): The robot to use for the exploration phase. Defaults to flood_fill_explore.
+        solver (SolverAlgorithm, optional): The robot to use for the solution phase. Defaults to dijkstra_solver.
 
     Returns:
         Robot: The robot's brain.
@@ -451,10 +479,14 @@ def _two_step_robot(
 def basic_weighted_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robot:
     """A robot that solves the maze using a simple implementation of the flood-fill algorithm.
 
+    Args:
+        maze (Maze): The maze.
+        goals (Set[tuple[int, int]]): The goal cells.
+
     Returns:
         Robot: The robot's brain.
     """
-    return _two_step_robot(
+    return two_step_robot(
         maze,
         goals,
         explorer=partial(
@@ -756,7 +788,7 @@ def thorough_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robo
     Returns:
         Robot: The robot's brain.
     """
-    return _two_step_robot(
+    return two_step_robot(
         maze,
         goals,
         explorer=partial(

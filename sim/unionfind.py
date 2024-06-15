@@ -71,7 +71,7 @@ class InvalidInitialMappingError(RuntimeError):
 
 class UnionFind[T]:
     """
-    A union-find data structure.
+    A union-find (disjoint-set) data structure.
     """
 
     def __init__(self, *args, **kwargs) -> None:

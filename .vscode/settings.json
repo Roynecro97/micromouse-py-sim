@@ -17,12 +17,16 @@
         "blit",
         "dtype",
         "dtypes",
+        "elif",
         "floodijkstra",
         "frompyfunc",
         "KMOD",
         "ndarray",
         "nout",
-        "pygame"
+        "numpy",
+        "pygame",
+        "pyproject",
+        "Veritasium"
     ],
     "python.testing.pytestArgs": [
         "tests"

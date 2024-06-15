@@ -1,8 +1,10 @@
 """Maze representation and utils
 
-This module contains a class for representing mazes and tools for loading and
+This module contains classes for representing mazes and tools for loading and
 saving mazes to files.
 """
+
+# pylint: disable=too-many-lines
 
 from __future__ import annotations
 
@@ -47,24 +49,47 @@ class Walls(Flag):
         return self.value.to_bytes()
 
     def to_bytes(self) -> bytes:
-        """Convert the wall specification to bytes."""
+        """Convert the wall specification to bytes.
+
+        Returns:
+            bytes: A single byte representing the walls.
+        """
         return bytes(self)
 
     @classmethod
     def from_bytes(cls, byte: bytes) -> Self:
-        """Create a wall specification from a byte."""
+        """Create a wall specification from a byte.
+        The upper nibble is ignored.
+
+        Args:
+            byte (bytes): The byte to convert.
+
+        Raises:
+            ValueError: ``byte`` is not exactly 1 byte long.
+
+        Returns:
+            Self: The parsed wall specification.
+        """
         if len(byte) != 1:
             raise ValueError(f"expected a single byte (got {len(byte)} bytes)")
         return cls(int.from_bytes(byte) & 0xF)
 
     @classmethod
     def none(cls) -> Self:
-        """Return a wall specification for no walls."""
+        """Create a wall specification for no walls.
+
+        Returns:
+            Self: An "empty" wall specification.
+        """
         return cls(0)
 
     @classmethod
     def all(cls) -> Self:
-        """Return a wall specification for all possible walls."""
+        """Create a wall specification for all possible walls.
+
+        Returns:
+            Self: A "full" wall specification.
+        """
         return ~cls.none()
 
     def rotate_right(self, n: int = 1) -> Self:
@@ -182,7 +207,14 @@ def _ascii_box(line: LineDirection) -> str:
 
 
 def ascii_charset(line: LineDirection) -> str:
-    """A simple charset that uses ASCII characters ('-', '|', '+') to draw tables"""
+    """A simple charset that uses ASCII characters ('-', '|', '+') to draw tables.
+
+    Args:
+        line (LineDirection): The line to draw.
+
+    Returns:
+        str: The box character according to this charset.
+    """
     match line:
         case LineDirection.EMPTY:
             return ' '
@@ -195,7 +227,14 @@ def ascii_charset(line: LineDirection) -> str:
 
 
 def utf8_charset(line: LineDirection) -> str:  # pylint: disable=too-many-return-statements
-    """A simple charset that uses the UTF-8 single-line box characters to draw tables"""
+    """A simple charset that uses the UTF-8 single-line box characters to draw tables.
+
+    Args:
+        line (LineDirection): The line to draw.
+
+    Returns:
+        str: The box character according to this charset.
+    """
     match line:
         case LineDirection.EMPTY: return ' '
         case LineDirection.HORIZONTAL: return '\u2500'
@@ -240,7 +279,18 @@ class Maze:
 
     @classmethod
     def empty(cls, height: int, width: int) -> Self:
-        """Initializes an empty maze with the provided size."""
+        """Create a new empty maze with the provided size.
+
+        Args:
+            height (int): The height of the maze.
+            width (int): The width of the maze.
+
+        Raises:
+            ValueError: If ``height`` of ``width`` is 0.
+
+        Returns:
+            Self: A new empty maze.
+        """
         size = height * width
         if not size:
             raise ValueError(f"invalid dimensions ({height}, {width}), 0 isn't allowed")
@@ -264,7 +314,18 @@ class Maze:
 
     @classmethod
     def full(cls, height: int, width: int) -> Self:
-        """Create a new full maze with the provided size."""
+        """Create a new full maze with the provided size.
+
+        Args:
+            height (int): The height of the maze.
+            width (int): The width of the maze.
+
+        Raises:
+            ValueError: If ``height`` of ``width`` is 0.
+
+        Returns:
+            Self: A new full maze.
+        """
         size = height * width
         if not size:
             raise ValueError(f"invalid dimensions ({height}, {width}), 0 isn't allowed")
@@ -273,23 +334,37 @@ class Maze:
 
     @classmethod
     def full_from_maze(cls, maze: Maze) -> Self:
-        """Create a new full maze from the provided maze."""
+        """Create a new full maze from the provided maze. (Clone the maze)
+
+        Args:
+            maze (Maze): The maze to clone.
+
+        Returns:
+            Self: A new maze with the same walls.
+        """
         return cls(maze._height, maze._width, _cells=bytearray(maze._cells), _validate=False)  # pylint: disable=protected-access
 
     @classmethod
     def from_maz_file(cls, maz: AnyPath | BinaryIO, size: MazeSize | None = None) -> Self:
-        """
-        Load a maze from a .maz file.
+        """Load a maze from a .maz file or file-like object.
 
         Format:
             A binary file where the byte at ``row * width + col`` represents the value of the cell at ``(row, col)``.
             The value of a cell is a byte where the top nibble is 0 and the lower nibble represents the walls (see ``maze.Walls``).
-            TODO: add links to the sample repos.
 
-        size (height, width):
-            If provided, use the provided dimensions.
-            If not provided, the file size must either be a square size (will be detected from the content length)
-            or specified in the file name in a "name.{height}x{width}.maz" format.
+        Args:
+            maz (AnyPath | BinaryIO): PathLike or (binary) FileLike object to read the maze from.
+            size (MazeSize | None, optional): The size of the maze. Defaults to None.
+                If None, the file size must either be a square size (will be detected from the content length)
+                or specified in the file name in a "name.{height}x{width}.maz" format.
+
+        Raises:
+            TypeError: Invalid type for the ``maz`` argument.
+            ValueError: ``size`` is specified, but does not match the content length.
+            ValueError: ``size`` is None, but the content length is not an integer square.
+
+        Returns:
+            Self: A new maze as specified in ``maz``.
         """
         if isinstance(maz, AnyPath):
             maz = open(maz, "rb")
@@ -307,18 +382,23 @@ class Maze:
 
     @classmethod
     def from_maz(cls, data: bytes, size: MazeSize | None = None) -> Self:
-        """
-        Load a maze from a .maz file or file-like object.
+        """Load a maze from a .maz bytes-like object.
 
         Format:
             A binary file where the byte at ``row * width + col`` represents the value of the cell at ``(row, col)``.
             The value of a cell is a byte where the top nibble is 0 and the lower nibble represents the walls (see ``maze.Walls``).
-            TODO: add links to the sample repos.
 
-        size (height, width):
-            If provided, use the provided dimensions.
-            If not provided, the file size must either be a square size (will be detected from the content length)
-            or specified in the file name in a "name.{height}x{width}.maz" format.
+        Args:
+            data (bytes): The maze's walls, as specified by the .maz format.
+            size (MazeSize | None, optional): The size of the maze. Defaults to None.
+                If None, the file size must either be a square size (will be detected from the content length).
+
+        Raises:
+            ValueError: ``size`` is specified, but does not match the content length.
+            ValueError: ``size`` is None, but the content length is not an integer square.
+
+        Returns:
+            Self: A new maze as specified in ``data``.
         """
         if size:
             height, width = size
@@ -331,19 +411,30 @@ class Maze:
 
     @classmethod
     def from_num_file(cls, num_file: AnyPath | TextIO, size: MazeSize | None = None) -> Self:
-        """
-        Load a maze from a .num file or file-like object.
+        """Load a maze from a .num file or file-like object.
 
         Format:
+            A textual file where each line contains 6 space-separated integers: X Y N E S W.
+            X & Y are the (X, Y) coordinate of the cell (Y - row, X - column).
+            N, E, S & W are boleans (0 or 1) representing whether the corresponding wall exist.
             For compatibility with the original, in this format ``(0, 0)`` is the bottom left corner
             (rather than top left) unlike the Maze class's behavior.
             The index ``(0, 0)`` is translated to ``(height - 1, 0)``.
-            TODO: add format explanation and links
 
-        size (height, width):
-            If provided, use the provided dimensions.
-            If not provided, the size in inferred from the file.
-            When inferring, all cells must be provided.
+        Args:
+            num_file (AnyPath | TextIO): PathLike or (text) FileLike object to read the maze from.
+            size (MazeSize | None, optional): The size of the maze. Defaults to None.
+                If None, the maze starts at the invalid size 0x0 and grows as needed to contain all
+                cells. When size is inferred from contents, all cells must be provided.
+
+        Raises:
+            TypeError: Invalid type for the ``num_file`` argument.
+            ValueError: The maze has no cells.
+            ValueError: ``size`` is None and the maze is not a rectangle.
+            ValueError: ``size`` is None and not all cells are specified.
+
+        Returns:
+            Self: A new maze as specified in ``num_file``.
         """
         assert list(Walls) == [Walls.NORTH, Walls.EAST, Walls.SOUTH, Walls.WEST]
 
@@ -380,7 +471,7 @@ class Maze:
                 raise ValueError("empty maze")
             width = len(cells[0])
             if not all(len(row) == width for row in cells):
-                raise ValueError("not a square maze, must specify all cells when not specifying size")
+                raise ValueError("not a rectangle maze, must specify all cells when not specifying size")
             none_cells = [
                 (row, col)
                 for row, cell_row in enumerate(cells)
@@ -399,12 +490,25 @@ class Maze:
 
     @classmethod
     def from_maze_file(cls, maze_file: AnyPath | TextIO, cell_height: int = 1, cell_width: int = 3, empty: str = ' ') -> Self:
-        """
-        Load a maze from a file or file-like object.
+        """Load a maze from a file or file-like object.
 
         Format:
-            A text drawing of the maze.
-            TODO: add format explanation and links
+            An ASCII-art drawing of the maze.
+
+        Args:
+            maze_file (AnyPath | TextIO): PathLike or (text) FileLike object to read the maze from.
+            cell_height (int, optional): The internal height (in UTF-8 characters, excluding walls) of a cell. Defaults to 1.
+            cell_width (int, optional): The internal width (in UTF-8 characters, excluding walls) of a cell. Defaults to 3.
+            empty (str, optional): The character that represents an empty space. Defaults to ' '.
+
+        Raises:
+            TypeError: Invalid type for the ``maze_file`` argument.
+            ValueError: The maze is empty.
+            ValueError: The maze is not a rectangle.
+            ValueError: The maze's drawing dimensions don't contain an integer amount of cells.
+
+        Returns:
+            Self: A maze matching the maze described in ``maze_file``.
         """
         if isinstance(maze_file, AnyPath):
             maze_file = open(maze_file, "rt", encoding="UTF-8")
@@ -418,8 +522,24 @@ class Maze:
 
     @classmethod
     def from_maze_text(cls, maze: str, cell_height: int = 1, cell_width: int = 3, empty: str = ' ') -> Self:
-        """
-        Load a maze from a UTF-8 drawing.
+        """Load a maze from a UTF-8 drawing.
+
+        Format:
+            An ASCII-art drawing of the maze.
+
+        Args:
+            maze (str): A UTF-8 drawing of a maze.
+            cell_height (int, optional): The internal height (in UTF-8 characters, excluding walls) of a cell. Defaults to 1.
+            cell_width (int, optional): The internal width (in UTF-8 characters, excluding walls) of a cell. Defaults to 3.
+            empty (str, optional): The character that represents an empty space. Defaults to ' '.
+
+        Raises:
+            ValueError: The maze is empty.
+            ValueError: The maze is not a rectangle.
+            ValueError: The maze's drawing dimensions don't contain an integer amount of cells.
+
+        Returns:
+            Self: A maze that matches the drawing.
         """
         lines = maze.splitlines(keepends=False)
         if not lines:
@@ -483,12 +603,22 @@ class Maze:
 
     @classmethod
     def from_csv_file(cls, csv_file: AnyPath | TextIO) -> Self:
-        """
-        Load a maze from a csv file or file-like object.
+        """Load a maze from a CSV file or file-like object.
 
         Format:
-            A csv where each row has the cells for the corresponding row
-            TODO: add format explanation and links
+            A csv where each row has the cells for the corresponding row.
+            (See the README or ``__NUMBERS_TO_WALLS`` for the meaning of the numbers)
+
+        Args:
+            csv_file (AnyPath | TextIO): PathLike or (text) FileLike object to read the maze from.
+
+        Raises:
+            TypeError: Invalid type for the ``maze_file`` argument.
+            ValueError: The maze is empty.
+            ValueError: The maze is not a rectangle.
+
+        Returns:
+            Self: A new maze as specified in ``csv_file``.
         """
         if isinstance(csv_file, AnyPath):
             csv_file = open(csv_file, "rt", encoding="ASCII")
@@ -502,12 +632,21 @@ class Maze:
 
     @classmethod
     def from_csv(cls, csv: str) -> Self:
-        """
-        Load a maze from a csv file or file-like object.
+        """Load a maze from a CSV string.
 
         Format:
-            A csv where each row has the cells for the corresponding row
-            TODO: add format explanation and links
+            A csv where each row has the cells for the corresponding row.
+            (See the README or ``__NUMBERS_TO_WALLS`` for the meaning of the numbers)
+
+        Args:
+            csv (str): A string with the contents of a CSV file.
+
+        Raises:
+            ValueError: The maze is empty.
+            ValueError: The maze is not a rectangle.
+
+        Returns:
+            Self: A new maze as specified in ``csv``.
         """
         lines = [
             [int(val) for val in line.split(',')]
@@ -531,21 +670,27 @@ class Maze:
 
     @classmethod
     def from_file(cls, maze_file: AnyPath, fmt: Literal['maz', 'num', 'csv', 'maze', None] = None) -> Self:
-        """
-        Load a maze from a file or file-like object.
-        If format is ``None``, it is detected from the extension:
-            .maz: maz file (see ``cls.from_maz_file()``).
-            .num: num file (see ``cls.from_maz_file()``).
-            .csv: csv file (see ``cls.from_maz_file()``).
-            default: maze file (see ``cls.from_maze_file()``).
+        """Load a maze from a file.
+
+        Args:
+            maze_file (AnyPath): PathLike object that point to a file to read the maze from.
+            fmt (Literal['maz', 'num', 'csv', 'maze', None], optional): The format of the file. Defaults to None.
+                If None, the format is auto-detected from the extension:
+                    .maz: maz file (see ``cls.from_maz_file()``).
+                    .num: num file (see ``cls.from_maz_file()``).
+                    .csv: csv file (see ``cls.from_maz_file()``).
+                    default: maze file (see ``cls.from_maze_file()``).
+
+        Returns:
+            Self: A maze matching the maze in the provided file.
         """
         if fmt is None:
             _, ext = os.path.splitext(maze_file)
             match ext:
-                case 'maz' | b'maz': fmt = 'maz'
-                case 'num' | b'num': fmt = 'num'
-                case 'csv' | b'csv': fmt = 'csv'
-                case 'maze' | b'maze': fmt = 'maze'
+                case '.maz' | b'.maz': fmt = 'maz'
+                case '.num' | b'.num': fmt = 'num'
+                case '.csv' | b'.csv': fmt = 'csv'
+                case '.maze' | b'.maze': fmt = 'maze'
                 case _:
                     # Didn't recognize extension
                     fmt = 'maze'
@@ -572,7 +717,7 @@ class Maze:
         return self._width
 
     @property
-    def cell_size(self) -> int:
+    def cell_count(self) -> int:
         """The amount of cells in the maze."""
         return len(self._cells)
 
@@ -580,13 +725,20 @@ class Maze:
         return row * self.width + col
 
     def get[T](self, row: int, col: int, default: T = None) -> Walls | T:
-        """Get a cell from the maze, or ``default`` if it doesn't exist."""
-        if row >= self.height or col >= self.width:
+        """Get a cell from the maze, or ``default`` if it doesn't exist.
+
+        Args:
+            row (int): The cell's row index.
+            col (int): The cell's column index.
+            default (T, optional): A default value to return if ``(row, col)`` is out=of-bounds. Defaults to None.
+
+        Returns:
+            Walls | T: The cell's wall specification, or ``default``.
+        """
+        if row >= self.height or col >= self.width or row < 0 or col < 0:
             return default
         cell = self._index(row, col)
-        assert cell < self.cell_size, f"bad cell calculation for {self.size=}, ({row=}, {col=}), {cell=}"
-        # if cell >= self.cell_size:
-        #     return default
+        assert cell < self.cell_count, f"bad cell calculation for {self.size=}, ({row=}, {col=}), {cell=}"
         return Walls(self._cells[cell])
 
     def __getitem__(self, idx: tuple[int, int]) -> Walls:
@@ -595,18 +747,15 @@ class Maze:
         row, col = idx
         val = self.get(row, col, _Missing())
         if isinstance(val, _Missing):
-            raise IndexError("TODO: pretty string")
+            raise IndexError("maze index out of range")
         return Walls(val)
 
     def __setitem__(self, idx: tuple[int, int], value: Walls) -> None:
         if not isinstance(idx, tuple) or len(idx) != 2 or not all(isinstance(i, int) for i in idx):
             raise TypeError(f"expected 2 ints: (row, col), got {idx!r}")
         row, col = idx
-        # TODO: make this prettier
-        if row >= self.height:
-            raise IndexError("TODO: pretty string")
-        if col >= self.width:
-            raise IndexError("TODO: pretty string")
+        if row >= self.height or col >= self.width or row < 0 or col < 0:
+            raise IndexError("maze index out of range")
 
         if row == 0 and not value & Walls.NORTH:
             raise ValueError("Missing NORTH wall in top row")
@@ -622,7 +771,13 @@ class Maze:
         self._remove_neighbor_walls(row, col, ~value)
 
     def add_walls(self, row: int, col: int, walls: Walls) -> None:
-        """Add walls to the maze."""
+        """Add walls to the maze. Adjacent cells are updated appropriately.
+
+        Args:
+            row (int): The cell's row index.
+            col (int): The cell's column index.
+            walls (Walls): The walls to add.
+        """
         self._cells[self._index(row, col)] |= walls.value
         self._add_neighbor_walls(row, col, walls)
 
@@ -640,7 +795,13 @@ class Maze:
                     self._cells[self._index(row, col - 1)] |= Walls.EAST.value
 
     def remove_walls(self, row: int, col: int, walls: Walls) -> None:
-        """Remove walls from the maze."""
+        """Remove walls from the maze. Adjacent cells are updated appropriately.
+
+        Args:
+            row (int): The cell's row index.
+            col (int): The cell's column index.
+            walls (Walls): The walls to remove.
+        """
         self._cells[self._index(row, col)] &= (~walls).value
         self._remove_neighbor_walls(row, col, walls)
 
@@ -686,7 +847,18 @@ class Maze:
             cell_height: int = 1,
             force_corners: bool = True,
     ) -> np.ndarray[tuple[int, int], np.dtypes.StrDType]:
-        """Render the maze as text (in a numpy 2D array)"""
+        """Render the maze as text (in a numpy 2D array).
+
+        Args:
+            charset (Charset, optional): The charset to use. Defaults to ascii_charset.
+            cell_width (int, optional): A cell's internal width (in UTF-8 characters, excluding walls). Defaults to 3.
+            cell_height (int, optional): A cell's internal height (in UTF-8 characters, excluding walls). Defaults to 1.
+            force_corners (bool, optional): Place corners in cornet positions even when a straight line would be appropriate.
+                Defaults to True.
+
+        Returns:
+            np.ndarray[tuple[int, int], np.dtypes.StrDType]: A 2D str array representing the maze.
+        """
         screen = np.array([[' ' for _ in range(self.width * (cell_width + 1) + 1)] for _ in range(self.height * (cell_height + 1) + 1)])
         bottom_row = self.height * (cell_height + 1)
         rightmost_col = self.width * (cell_width + 1)
@@ -738,7 +910,18 @@ class Maze:
         return screen
 
     def render(self, charset: Charset = ascii_charset, cell_width: int = 3, cell_height: int = 1, force_corners: bool = True) -> str:
-        """Render the maze as text"""
+        """Render the maze as text.
+
+        Args:
+            charset (Charset, optional): The charset to use. Defaults to ascii_charset.
+            cell_width (int, optional): A cell's internal width (in UTF-8 characters, excluding walls). Defaults to 3.
+            cell_height (int, optional): A cell's internal height (in UTF-8 characters, excluding walls). Defaults to 1.
+            force_corners (bool, optional): Place corners in cornet positions even when a straight line would be appropriate.
+                Defaults to True.
+
+        Returns:
+            str: A string representing the maze.
+        """
         return '\n'.join(''.join(row) for row in self.render_screen(charset, cell_width, cell_height, force_corners)) + '\n'
 
     def _validate(self) -> None:
@@ -881,7 +1064,7 @@ class ExtendedMaze(Maze):
         Returns:
             float: The percentage of cells that were visited.
         """
-        return self.explored_cells_count() / self.cell_size
+        return self.explored_cells_count() / self.cell_count
 
     @property
     def connectivity(self) -> UnionFind[tuple[int, int]]:
@@ -964,7 +1147,17 @@ class ExtendedMaze(Maze):
             goals: Set[tuple[int, int]] = frozenset(),
             weights: bool = True,
     ) -> str:
-        """Render the maze with extra information"""
+        """Render the maze with extra information.
+
+        Args:
+            charset (Charset, optional): The charset to use. Defaults to ascii_charset.
+            pos (tuple[int, int, Direction] | None, optional): The robot's position and heading. Defaults to None.
+            goals (Set[tuple[int, int]], optional): The goal cells. Defaults to frozenset().
+            weights (bool, optional): If True, also display the cells' weights. Defaults to True.
+
+        Returns:
+            str: _description_
+        """
         cell_width = cell_height = 1
         if weights:
             cell_width = max(len(str(info.weight)) if info.weight else 1 for _, _, info in self.iter_info())

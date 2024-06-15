@@ -141,7 +141,23 @@ def __maze(arg: str) -> Maze:
 
 
 def maze(arg: str) -> Maze:
-    """Maze type for argparse."""
+    """Maze type for argparse.
+
+    Format:
+        The maze type format is either an optional maze format name followed by a semicolon
+        and a file path (if the format is not specified, it is deduced from the file suffix
+        and defaults to '.maze') or a maze format followed by a semicolon and then a maze
+        literal (the contents of a file with the matching format).
+
+    Args:
+        arg (str): The command-line argument.
+
+    Raises:
+        argparse.ArgumentTypeError: Invalid format or an error occurred while reading/parsing the maze.
+
+    Returns:
+        Maze: The maze parsed from the argument.
+    """
     try:
         return __maze(arg)
     except argparse.ArgumentTypeError:
@@ -151,37 +167,87 @@ def maze(arg: str) -> Maze:
 
 
 def size(arg: str) -> tuple[int, int]:
-    """
-    Size type for argparse.
-    A "size" is a tuple of (height, width) coordinates in a "{height}x{width}" format.
+    """Size type for argparse.
+
+    Format:
+        A "size" is a tuple of (height, width) coordinates in a "{height}x{width}" format.
+
+    Args:
+        arg (str): The command-line argument.
+
+    Raises:
+        ValueError: The argument is not in a {number}x{number} format.
+
+    Returns:
+        tuple[int, int]: A (height, width) size.
     """
     if m := re.fullmatch(r'(?P<height>\d+)x(?P<width>\d+)', arg):
         return (int(m['height']), int(m['width']))
     raise ValueError
 
 
+
 def position(arg: str) -> tuple[int, int]:
+    """Position type for argparse.
+
+    Format:
+        A "position" is a tuple of (row, col) coordinates in a "({row}, {col})" format.
+        Meaning a "position" is 2 comma-separated integers that can be surrounded by parentheses
+        (but don't have to be), and whitespace is ignored.
+
+    Args:
+        arg (str): The command-line argument.
+
+    Raises:
+        ValueError: The argument is in an incorrect format.
+
+    Returns:
+        tuple[int, int]: A (row, col) coordinate.
     """
-    Position type for argparse.
-    A "position" is a tuple of (row, col) coordinates in a "({row}, {col})" format.
-    """
-    if m := re.fullmatch(r'(?P<open>\()?\s*(?P<row>\d+)\s*,\s*(?P<col>\d+)\s*(?(open)\)|)', arg):
+    if m := re.fullmatch(r'(?P<open>\()?\s*(?P<row>\d+)\s*,\s*(?P<col>\d+)\s*(?(open)\)|)', arg.strip()):
         return (int(m['row']), int(m['col']))
     raise ValueError
 
 
 def position_set(arg: str) -> Set[tuple[int, int]]:
-    """Position set type for argparse. A "position" is a tuple of (row, col) coordinates."""
+    """Position set type for argparse.
+
+    Format:
+        A list of semicolon-separated positions (see ``position(arg)``).
+
+    Args:
+        arg (str): The command-line argument.
+
+    Raises:
+        ValueError: The argument is in an incorrect format.
+
+    Returns:
+        Set[tuple[int, int]]: A set of (row, col) coordinates.
+    """
     return {position(pos) for pos in arg.split(':')}
 
 
 def direction(arg: str) -> Direction:
-    """Direction type for argparse."""
+    """Direction type for argparse.
+
+    Format:
+        A case insensitive name or abbreviation of a cardinal direction.
+        (See ``Direction.from_str(s)``).
+
+    Args:
+        arg (str): The command-line argument.
+
+    Raises:
+        ValueError: The argument is in an incorrect format.
+
+    Returns:
+        Direction: A cardinal direction.
+    """
     return Direction.from_str(arg)
 
 
 class Preset(TypedDict, total=True):
-    """A maze + starting point + goals preset."""
+    """A maze + starting point + starting direction + goals preset."""
     file: str
     start_pos: tuple[int, int]
     start_direction: Direction

@@ -22,18 +22,22 @@ class RelativeDirection(Enum):
     RIGHT = auto()
 
     @overload
-    def invert(self: Literal[FRONT]) -> Literal[BACK]: ...
+    def invert(self: Literal[RelativeDirection.FRONT]) -> Literal[RelativeDirection.BACK]: ...
     @overload
-    def invert(self: Literal[BACK]) -> Literal[FRONT]: ...
+    def invert(self: Literal[RelativeDirection.BACK]) -> Literal[RelativeDirection.FRONT]: ...
     @overload
-    def invert(self: Literal[LEFT]) -> Literal[RIGHT]: ...
+    def invert(self: Literal[RelativeDirection.LEFT]) -> Literal[RelativeDirection.RIGHT]: ...
     @overload
-    def invert(self: Literal[RIGHT]) -> Literal[LEFT]: ...
+    def invert(self: Literal[RelativeDirection.RIGHT]) -> Literal[RelativeDirection.LEFT]: ...
     @overload
     def invert(self) -> RelativeDirection: ...
 
     def invert(self) -> RelativeDirection:
-        """Invert the direction (left <-> right; front <-> back)"""
+        """Invert the direction (left <-> right; front <-> back)
+
+        Returns:
+            RelativeDirection: The inverted direction.
+        """
         match self:
             case RelativeDirection.FRONT: return RelativeDirection.BACK
             case RelativeDirection.BACK: return RelativeDirection.FRONT
@@ -53,7 +57,11 @@ class Direction(IntEnum):
     SOUTH_WEST = SOUTH | WEST
 
     def turn_left(self) -> Direction:  # pylint: disable=too-many-return-statements
-        """Return the direction that is the result of turning left (90 degrees counter-clockwise)."""
+        """Return the direction that is the result of turning left (90 degrees counter-clockwise).
+
+        Returns:
+            Direction: The result of turning left.
+        """
         match self:
             case Direction.NORTH: return Direction.WEST
             case Direction.EAST: return Direction.NORTH
@@ -65,7 +73,11 @@ class Direction(IntEnum):
             case Direction.SOUTH_WEST: return Direction.SOUTH_EAST
 
     def turn_right(self) -> Direction:  # pylint: disable=too-many-return-statements
-        """Return the direction that is the result of turning right (90 degrees clockwise)."""
+        """Calculate the direction that is the result of turning right (90 degrees clockwise).
+
+        Returns:
+            Direction: The result of turning right.
+        """
         match self:
             case Direction.NORTH: return Direction.EAST
             case Direction.EAST: return Direction.SOUTH
@@ -77,7 +89,11 @@ class Direction(IntEnum):
             case Direction.SOUTH_WEST: return Direction.NORTH_WEST
 
     def turn_back(self) -> Direction:  # pylint: disable=too-many-return-statements
-        """Return the direction that is the result of turning back (180 degrees)."""
+        """Calculate the direction that is the result of turning back (180 degrees).
+
+        Returns:
+            Direction: The result of turning back.
+        """
         match self:
             case Direction.NORTH: return Direction.SOUTH
             case Direction.EAST: return Direction.WEST
@@ -89,7 +105,11 @@ class Direction(IntEnum):
             case Direction.SOUTH_WEST: return Direction.NORTH_EAST
 
     def half_turn_left(self) -> Direction:  # pylint: disable=too-many-return-statements
-        """Return the direction that is the result of turning left (90 degrees counter-clockwise)."""
+        """Calculate the direction that is the result of a half turn left (45 degrees counter-clockwise).
+
+        Returns:
+            Direction: The result of a half turn left.
+        """
         match self:
             case Direction.NORTH: return Direction.NORTH_WEST
             case Direction.EAST: return Direction.NORTH_EAST
@@ -101,7 +121,11 @@ class Direction(IntEnum):
             case Direction.SOUTH_WEST: return Direction.SOUTH
 
     def half_turn_right(self) -> Direction:  # pylint: disable=too-many-return-statements
-        """Return the direction that is the result of turning right (90 degrees clockwise)."""
+        """Calculate the direction that is the result of a half turn right (45 degrees clockwise).
+
+        Returns:
+            Direction: The result of a half turn right.
+        """
         match self:
             case Direction.NORTH: return Direction.NORTH_EAST
             case Direction.EAST: return Direction.SOUTH_EAST
@@ -113,7 +137,14 @@ class Direction(IntEnum):
             case Direction.SOUTH_WEST: return Direction.WEST
 
     def turn(self, rel: RelativeDirection) -> Direction:
-        """Return the direction that is the result of turning in the provided relative direction."""
+        """Calculate the direction that is the result of turning in the provided relative direction.
+
+        Args:
+            rel (RelativeDirection): The direction to turn to.
+
+        Returns:
+            Direction: The result of the turn.
+        """
         match rel:
             case RelativeDirection.FRONT: return self
             case RelativeDirection.BACK: return self.turn_back()
@@ -121,7 +152,14 @@ class Direction(IntEnum):
             case RelativeDirection.RIGHT: return self.turn_right()
 
     def half_turn(self, rel: RelativeDirection) -> Direction:
-        """Return the direction that is the result of half a turn in the provided relative direction."""
+        """Calculate the direction that is the result of half a turn in the provided relative direction.
+
+        Args:
+            rel (RelativeDirection): The direction to turn to.
+
+        Returns:
+            Direction: The result of the turn.
+        """
         match rel:
             case RelativeDirection.FRONT: return self
             case RelativeDirection.BACK: raise ValueError("cannot half turn back")
@@ -129,7 +167,11 @@ class Direction(IntEnum):
             case RelativeDirection.RIGHT: return self.half_turn_right()
 
     def to_degrees(self) -> Literal[0, 45, 90, 135, 180, 225, 270, 315]:  # pylint: disable=too-many-return-statements
-        """Get the rotation degrees. EAST is 0 deg, degrees increase clockwise."""
+        """Get the rotation degrees. EAST is 0 deg, degrees increase clockwise.
+
+        Returns:
+            Literal[0, 45, 90, 135, 180, 225, 270, 315]: The rotation degree.
+        """
         match self:
             case Direction.EAST: return 0
             case Direction.SOUTH_EAST: return 45
@@ -141,12 +183,28 @@ class Direction(IntEnum):
             case Direction.NORTH_EAST: return 315
 
     def to_radians(self) -> float:
-        """Get the rotation radians. EAST is 0, angles increase clockwise."""
+        """Get the rotation radians. EAST is 0, angles increase clockwise.
+
+        Returns:
+            float: The rotation angle in radians.
+        """
         return math.radians(self.to_degrees())
 
     @staticmethod
     def from_str(direction: str) -> Direction:  # pylint: disable=too-many-return-statements
-        """Create from a direction name."""
+        """Create from a direction name.
+        The direction name is case insensitive and can be either a full name or
+        an abbreviation.
+
+        Args:
+            direction (str): A string representing a cardinal direction.
+
+        Raises:
+            ValueError: The ``direction`` string is invalid.
+
+        Returns:
+            Direction: The direction represented by the string.
+        """
         match direction.strip().casefold():
             case 'north' | 'n':
                 return Direction.NORTH
