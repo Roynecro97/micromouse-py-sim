@@ -21,7 +21,7 @@ from typing import overload, TYPE_CHECKING
 
 from . import const, flood_fill, idle, random, utils, wall_follower
 from .const import predetermined_robot
-from .flood_fill import simple_flood_fill, basic_weighted_flood_fill, thorough_flood_fill
+from .flood_fill import simple_flood_fill, basic_weighted_flood_fill, thorough_flood_fill, dijkstra_flood_fill
 from .idle import idle_robot
 from .random import random_robot
 from .utils import Action, RobotState
@@ -41,6 +41,7 @@ ROBOTS: dict[str, Algorithm] = {
     'Flood Fill': simple_flood_fill,
     'Flood Fill -> Dijkstra': basic_weighted_flood_fill,
     'Thorough Flood Fill': thorough_flood_fill,
+    'Dijkstra Flood Fill': dijkstra_flood_fill,
 }
 
 

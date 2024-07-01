@@ -574,6 +574,80 @@ def mark_deadends(
         tmp_maze.remove_walls(*pos, missing)
 
 
+class GiveUpTimer:
+    """Count steps to give up."""
+
+    def __init__(self, *, limit: int | None, autostart: bool = False):
+        """Initialize a GiveUpTimer.
+
+        Args:
+            limit (int | None): The amount of steps to give up after, ``None`` means never.
+            autostart (bool, optional): Start the timer immediately. Defaults to False.
+        """
+        self.__limit = limit
+        self.__started = autostart
+        self.__count = 0
+
+    @property
+    def limit(self) -> int | None:
+        """The limit for the counter."""
+        return self.__limit
+
+    @property
+    def started(self) -> bool:
+        """Whether the timer is started."""
+        return self.__started
+
+    @property
+    def stopped(self) -> bool:
+        """Whether the timer is stopped (not started)."""
+        return not self.started
+
+    @property
+    def count(self) -> int:
+        """The timer's current counter."""
+        return self.__count
+
+    def reset(self, *, stop: bool = True):
+        """Reset the timer's internal counter.
+
+        Args:
+            stop (bool, optional): If True, also stop the timer. Defaults to True.
+        """
+        self.__count = 0
+        if stop:
+            self.stop()
+
+    def start(self) -> None:
+        """Start the timer."""
+        self.__started = True
+
+    def stop(self) -> None:
+        """Stop the timer."""
+        self.__started = False
+
+    def update(self, amount: int = 1) -> None:
+        """Update the timer by the amount of steps if it is started.
+        If the timer is stopped, this method has no effect.
+
+        Args:
+            amount (int, optional): The amount of steps to update. Defaults to 1.
+        """
+        if self.started:
+            self.__count += amount
+
+    @property
+    def expired(self) -> bool:
+        """Whether the timer is expired -> more steps than the limit were counted."""
+        return self.started and self.limit is not None and self.limit < self.count
+
+    def __bool__(self) -> bool:
+        return not self.expired
+
+    def __repr__(self) -> str:
+        return f"<{type(self).__name__}: limit={self.limit!r}, started={self.started!r}, count={self.count!r}>"
+
+
 def identity[T](obj: T) -> T:
     """Return ``obj``.
 
