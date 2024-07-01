@@ -68,7 +68,9 @@ class GUIRenderer(Renderer):  # pylint: disable=too-many-instance-attributes
         self.wall_color = 'red'
         self.robot_main_color = 'blue'
         self.robot_second_color = 'yellow'
+        self.robot_highlight_color = 'white'
         self.goal_color = 'green'
+        self.route_color = 'magenta'
         self.heatmap_colors = ['blue', 'cyan', 'green', 'yellow', 'orange', 'red', 'brown']
         self.ui_manager = pygame_gui.UIManager((screen.get_width(), screen.get_height()))
         self.start_button = pygame_gui.elements.UIButton(
@@ -238,7 +240,7 @@ class GUIRenderer(Renderer):  # pylint: disable=too-many-instance-attributes
             robot_direction: Direction = Direction.NORTH,
             *,
             heatmap: bool = False,
-    ):  # pylint: disable=too-many-arguments,too-many-locals
+    ):  # pylint: disable=too-many-arguments,too-many-locals,too-many-branches
         """Draw the maze on screen.
 
         Args:
@@ -249,22 +251,12 @@ class GUIRenderer(Renderer):  # pylint: disable=too-many-instance-attributes
             robot_direction (Direction): Direction robot is facing. Defaults to north.
             heatmap (bool): Draw heatmap on maze. Defaults to False.
         """
-        # Draw robot's route before all other maze elements:
-        for i, cell in enumerate(maze.route):
-            x1 = cell[1] * tile_size + offset[0]
-            y1 = cell[0] * tile_size + offset[1]
-            if i + 1 < len(maze.route):
-                next_cell = maze.route[i + 1]
-                x2 = next_cell[1] * tile_size + offset[0]
-                y2 = next_cell[0] * tile_size + offset[1]
-                self.draw_route_cell(Position(x1, y1), Position(x2, y2), 'magenta')
-
         wall_color = pg.Color(self.wall_color)
-        for row, col, walls in maze:
+        screen_robot_pos: Position | None = None
+        for row, col, walls, extra_info in maze.iter_all():
             x = col * tile_size + offset[0]
             y = row * tile_size + offset[1]
             current_pos = Position(x, y)
-            extra_info = maze.extra_info[row, col]
 
             if heatmap:
                 self.draw_heatmap(extra_info, current_pos)
@@ -276,22 +268,49 @@ class GUIRenderer(Renderer):  # pylint: disable=too-many-instance-attributes
             self.fill_cell_color(extra_info.color, current_pos, 128)
 
             if (col, row) == robot_pos:
-                self.draw_robot(current_pos, robot_direction)
-
-            if extra_info.weight is not None:
-                self.draw_text_by_center(str(extra_info.weight), tile_size // 2, current_pos + Position(tile_size // 2, tile_size // 2))
+                screen_robot_pos = current_pos
 
             line_end = self.wall_thickness // 2
             if Walls.NORTH in walls:
                 pg.draw.line(self.screen, wall_color, (x - line_end, y), (x + line_end + tile_size, y), self.wall_thickness)
             if Walls.EAST in walls:
-                pg.draw.line(self.screen, wall_color, (x + tile_size, y - line_end),
-                             (x + tile_size, y + line_end + tile_size), self.wall_thickness)
+                pg.draw.line(
+                    self.screen,
+                    wall_color,
+                    (x + tile_size, y - line_end),
+                    (x + tile_size, y + line_end + tile_size),
+                    self.wall_thickness,
+                )
             if Walls.SOUTH in walls:
-                pg.draw.line(self.screen, wall_color, (x - line_end, y + tile_size),
-                             (x + line_end + tile_size, y + tile_size), self.wall_thickness)
+                pg.draw.line(
+                    self.screen,
+                    wall_color,
+                    (x - line_end, y + tile_size),
+                    (x + line_end + tile_size, y + tile_size),
+                    self.wall_thickness,
+                )
             if Walls.WEST in walls:
                 pg.draw.line(self.screen, wall_color, (x, y - line_end), (x, y + line_end + tile_size), self.wall_thickness)
+
+        # Draw robot's route after all other maze elements:
+        for i in range(len(maze.route) - 1):
+            self.draw_route_cell(
+                Position(maze.route[i][1] * tile_size + offset[0], maze.route[i][0] * tile_size + offset[1]),
+                Position(maze.route[i + 1][1] * tile_size + offset[0], maze.route[i + 1][0] * tile_size + offset[1]),
+                self.route_color,
+            )
+
+        assert screen_robot_pos is not None, "Robot not in maze"
+        self.draw_robot(screen_robot_pos, robot_direction)
+
+        for row, col, extra_info in maze.iter_info():
+            current_pos = Position(col * tile_size + offset[0], row * tile_size + offset[1])
+            if extra_info.weight is not None:
+                self.draw_text_by_center(
+                    str(extra_info.weight),
+                    self.half_tile,
+                    current_pos + Position(self.half_tile + 1, self.half_tile + 1),
+                )
 
     def fill_cell_color(self, color: tuple[int, int, int] | str | None, pos: Position, alpha: int = 255):
         """Fills a cell with color
@@ -332,8 +351,8 @@ class GUIRenderer(Renderer):  # pylint: disable=too-many-instance-attributes
         if color is not None:
             pg_color = pg.Color(color)
             pg_color.a = alpha
-            current_pos += Position(self.half_tile, self.half_tile)
-            next_pos += Position(self.half_tile, self.half_tile)
+            current_pos += Position(self.half_tile + 1, self.half_tile + 1)
+            next_pos += Position(self.half_tile + 1, self.half_tile + 1)
             self.draw_round_corners_line(current_pos, next_pos, pg_color, 3)
 
     def draw_heatmap(self, info: ExtraCellInfo, cell_pos: Position):
@@ -358,12 +377,13 @@ class GUIRenderer(Renderer):  # pylint: disable=too-many-instance-attributes
             robot_pos (Position): Position of robot in maze (in pixels).
             robot_direction (Direction): The direction in which robot is facing.
         """
-        robot_radius = self.half_tile * 0.8
-        robot_pos = robot_pos + Position(self.half_tile, self.half_tile)
+        robot_radius = self.half_tile * 0.7
+        robot_pos = robot_pos + Position(self.half_tile + 1, self.half_tile + 1)
+        pg.draw.circle(self.screen, self.robot_highlight_color, robot_pos, robot_radius + 2)
         pg.draw.circle(self.screen, self.robot_main_color, robot_pos, robot_radius)
         heading_point = robot_pos + Position(round(robot_radius * math.cos(robot_direction.to_radians())),
                                              round(robot_radius * math.sin(robot_direction.to_radians())))
-        pg.draw.line(self.screen, self.robot_second_color, robot_pos, heading_point, 1)
+        pg.draw.line(self.screen, self.robot_second_color, robot_pos, heading_point, 3)
 
     def draw_text_by_center(self, text: str, size: int, center: Position, color='white'):
         """Draw text on screen by the position of the center of the text rectangle.
