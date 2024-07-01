@@ -273,7 +273,7 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
                 if self._robot_pos[:-1] != self._begin[:-1] or self._status is not SimulationStatus.IN_PROGRESS_FOUND_DEST:
                     self._status = SimulationStatus.ERROR
                     raise RuntimeError("reset must be done from the starting position and after finding the goal")
-                self._maze.reset_info()
+                # self._maze.reset_info()  # Reset would affect explore percentage & reset the heatmap
                 self._robot_pos = self._begin
                 self._status = SimulationStatus.READY  # Allow the robot to call ready again
             case Action.FORWARD | Action.BACKWARDS:

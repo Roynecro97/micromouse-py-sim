@@ -14,6 +14,7 @@ from typing import Protocol, TypedDict, TYPE_CHECKING
 
 from .utils import (
     Action,
+    GiveUpTimer,
     abs_turn_to_actions,
     adjacent_cells,
     build_weighted_graph,
@@ -569,7 +570,8 @@ def _calc_unknown_groups(  # pylint: disable=too-many-arguments
     def in_goal(*cells: tuple[int, int]) -> bool:
         return all(cell in goals for cell in cells)
 
-    mark_deadends(maze, pos, start, goals, deadend_color)
+    if deadend_color is not None:
+        mark_deadends(maze, pos, start, goals, deadend_color)
 
     groups: UnionFind[tuple[int, int]] = UnionFind()
     for row, col, walls, info in maze.iter_all():
@@ -602,8 +604,62 @@ def _calc_unknown_groups(  # pylint: disable=too-many-arguments
     return (
         groups,
         reduce(or_, groups.iter_sets(), set()),
-        _mark_deadends_flood(maze, groups.iter_sets(), goals, deadend_color),
+        _mark_deadends_flood(maze, groups.iter_sets(), goals, deadend_color) if deadend_color is not None else [],
     )
+
+
+def dijkstra_navigator(  # pylint: disable=too-many-arguments
+        maze: ExtendedMaze,
+        dest: tuple[int, int],
+        pos: RobotState,
+        *,
+        name: str = "dijkstra navigator",
+        action: str = "navigating",
+        reset_colors: bool = True,
+) -> Robot:
+    """Navigate to a specific cell with Dijkstra's algorithm.
+
+    This is meant as a tool for other robots and does not yield the READY action.
+
+    Args:
+        maze (ExtendedMaze): The maze.
+        dest (tuple[int, int]): The destination cell.
+        pos (RobotState): The robot's current position + heading.
+        name (str, optional): The primary robot's name (for prints). Defaults to "dijkstra navigator".
+        action (str, optional): The action's name (for prints). Defaults to "navigating".
+        reset_colors (bool, optional): If True, also reset the color of visited cells. Defaults to True.
+
+    Returns:
+        Robot: The robot's brain.
+    """
+    _ = maze.changed()  # Consume the change marker
+    while pos[:-1] != dest:
+        routes = dijkstra(
+            build_weighted_graph(maze, DEFAULT_DIJKSTRA_WEIGHTS, start=pos),
+            pos[:-1],
+            goals={dest},
+        )
+        print(f"{name}: @{pos} -> {routes[dest][1]}")
+        assert routes[dest][1][0] == pos[:-1], f"robot is at {pos[:-1]} but route starts at {routes[dest][1][0]}"
+        return_bot = predetermined_path_robot(
+            maze,
+            {dest},
+            path=routes[dest][1],
+            initial_heading=pos[-1],
+        )
+        assert next(return_bot, None) is Action.READY
+        pos = yield Action.READY
+        while True:
+            if reset_colors:
+                maze.extra_info[pos[:-1]].color = None
+            try:
+                pos = yield return_bot.send(pos)
+            except StopIteration:
+                assert pos[:-1] == dest
+                break
+            if maze.changed():
+                print(f"{name}: encountered a wall while {action}")
+                break  # recalculate route, a new wall was added
 
 
 def flood_fill_thorough_explorer(  # pylint: disable=too-many-branches,too-many-statements,too-many-locals
@@ -641,8 +697,7 @@ def flood_fill_thorough_explorer(  # pylint: disable=too-many-branches,too-many-
         minor_priority=minor_priority,
     )
     assert next(flood_bot, None) is Action.READY
-    pos = yield Action.READY
-    start_pos = pos
+    start_pos = pos = yield Action.READY
     while True:
         try:
             pos = yield flood_bot.send(pos)
@@ -753,33 +808,13 @@ def flood_fill_thorough_explorer(  # pylint: disable=too-many-branches,too-many-
         maze.extra_info[dest].reset_color_if('green')
 
     print(f"flood hunter: done exploring - {maze.explored_cells_percentage()=:.02%}/{percentage=:.02%}")
-    _ = maze.changed()  # Consume the change marker
-    while pos[:-1] != start_pos[:-1]:
-        routes = dijkstra(
-            build_weighted_graph(maze, DEFAULT_DIJKSTRA_WEIGHTS, start=pos),
-            pos[:-1],
-            goals={start_pos[:-1]},
-        )
-        print(f"flood hunter: @{pos} -> {routes[start_pos[:-1]][1]}")
-        assert routes[start_pos[:-1]][1][0] == pos[:-1], f"robot is at {pos[:-1]} but route starts at {routes[start_pos[:-1]][1][0]}"
-        return_bot = predetermined_path_robot(
-            maze,
-            {start_pos[:-1]},
-            path=routes[start_pos[:-1]][1],
-            initial_heading=pos[-1],
-        )
-        assert next(return_bot, None) is Action.READY
-        pos = yield Action.READY
-        while True:
-            maze.extra_info[pos[:-1]].color = None
-            try:
-                pos = yield return_bot.send(pos)
-            except StopIteration:
-                assert pos[:-1] == start_pos[:-1]
-                break
-            if maze.changed():
-                print("flood hunter: encountered a wall while going home")
-                break  # recalculate route, a new wall was added
+    yield from dijkstra_navigator(
+        maze,
+        start_pos[:-1],
+        pos,
+        name="flood hunter",
+        action="going home",
+    )
 
 
 def thorough_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robot:
@@ -795,4 +830,156 @@ def thorough_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robo
             flood_fill_thorough_explorer,
             flood_weight=simple_flood_weight_with_strong_visit_bias,
         ),
+    )
+
+
+def flood_fill_dijkstra_explorer(  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+        maze: ExtendedMaze,
+        goals: Set[tuple[int, int]],
+        *,
+        route_give_up_limit: int | None = 6,
+        flood_weight: WeightCalc = simple_flood_weight,
+        minor_priority: MinorPriority = identity,
+) -> Robot:
+    """A robot that explores the maze using a mix of the flood-fill algorithm and Dijkstra's algorithm.
+
+    THIS IS MEANT AS A FIRST STEP ROBOT!
+
+    Args:
+        maze (ExtendedMaze): The maze.
+        goals (Set[tuple[int, int]]): The final goals.
+        route_give_up_limit (int | None, optional): Specifies after how many actions the robot should recalculate
+            the route it explores, ``None`` means "never". Defaults to 10.
+        flood_weight (WeightCalc, optional): Exploration weight. Defaults to simple_flood_weight.
+        minor_priority (MinorPriority, optional): Exploration minor priority. Defaults to identity.
+
+    Returns:
+        Robot: The robot's brain.
+    """
+    timer = GiveUpTimer(limit=route_give_up_limit)
+    explorer = partial(
+        single_flood_fill,
+        maze,
+        weight=flood_weight,
+        minor_priority=minor_priority,
+    )
+
+    # First, find the goal
+    # We cannot use ``yield from`` because we need the final reply from the yield
+    print(f"dijkstra hunter: looking for {goals=}")
+    flood_bot = explorer(goals)
+    assert next(flood_bot, None) is Action.READY
+    start_pos = pos = yield Action.READY
+    while True:
+        try:
+            pos = yield flood_bot.send(pos)
+        except StopIteration:
+            break
+        # mark_deadends(maze, pos[:-1], start_pos[:-1], goals, 'orange')
+
+    print(f"dijkstra hunter: found goals! (explored {maze.explored_cells_percentage()=:.02%})")
+
+    while maze.explored_cells_percentage() < 1.0:
+        # Find the best routes
+        routes = dijkstra(
+            build_weighted_graph(
+                maze,
+                DEFAULT_DIJKSTRA_WEIGHTS,
+                start=start_pos,
+            ),
+            src=start_pos[:-1],
+            goals=goals,
+        )
+
+        weight, best = min(  # there is at least 1 route
+            (routes.get(goal, (math.inf, [])) for goal in goals),
+            key=lambda weight_route: (weight_route[0], len(weight_route[1])),
+        )
+
+        assert math.isfinite(weight)
+        assert best[0] == start_pos[:-1]
+        assert best[-1] in goals
+
+        # It's impossible to discover a wall between an unknown cell and a known cell,
+        # we can always assume that a newly encountered wall is between an unknown cell
+        # and the current cell.
+        cells = {cell: i for i, cell in enumerate(best)}
+        _, all_unknown, _ = _calc_unknown_groups(maze, pos[:-1], start_pos[:-1], goals, deadend_color=None)
+        missing_cells = all_unknown & set(cells)
+        if not missing_cells:
+            break
+
+        for cell in best:
+            maze.extra_info[cell].color = 'green' if cell in missing_cells else 'purple'
+
+        def _bad_wall(cell: tuple[int, int]) -> bool:
+            if (cell_idx := cells.get(cell, None)) is None:
+                return False
+
+            adj_cells = frozenset(adjacent_cells(maze, (cell,)))
+            return (
+                (cell_idx > 0 and best[cell_idx - 1] not in adj_cells) or
+                (cell_idx < len(best) - 1 and best[cell_idx + 1] not in adj_cells)
+            )
+
+        timer.reset()
+        while missing_cells and timer:
+            flood_bot = explorer(missing_cells)
+            assert next(flood_bot, None) is Action.READY
+
+            while timer:
+                try:
+                    pos = yield flood_bot.send(pos)
+                except StopIteration:
+                    break
+
+                _, all_unknown, _ = _calc_unknown_groups(maze, pos[:-1], start_pos[:-1], goals, deadend_color=None)
+                timer.update()
+
+                if updated_cells := missing_cells - all_unknown:
+                    for cell in updated_cells:
+                        # print(f"dijkstra hunter: explored {cell}")
+                        maze.extra_info[cell].color = 'purple'
+
+                        # Check if we found a wall that cuts the path (no need if the timer started)
+                        if timer.stopped and _bad_wall(cell):
+                            timer.start()
+                            break
+
+                    missing_cells &= all_unknown
+
+                    # Restart the explorer with a new goal
+                    flood_bot.close()
+                    flood_bot = explorer(missing_cells)
+                    assert next(flood_bot, None) is Action.READY
+            else:
+                # Stop the robot
+                flood_bot.close()
+
+        for cell in best:
+            maze.extra_info[cell].reset_color_if('purple')
+            maze.extra_info[cell].reset_color_if('green')
+    else:
+        print("dijkstra hunter: explored the entire maze")
+
+    print(f"dijkstra hunter: done exploring - {maze.explored_cells_percentage()=:.02%}")
+    yield from dijkstra_navigator(
+        maze,
+        start_pos[:-1],
+        pos,
+        name="dijkstra hunter",
+        action="going home",
+    )
+
+
+def dijkstra_flood_fill(maze: ExtendedMaze, goals: Set[tuple[int, int]]) -> Robot:
+    """A robot that solves the maze using an advanced implementation of the flood-fill algorithm and some dijkstra.
+
+    Returns:
+        Robot: The robot's brain.
+    """
+    return two_step_robot(
+        maze,
+        goals,
+        explorer=flood_fill_dijkstra_explorer,
     )

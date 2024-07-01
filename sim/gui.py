@@ -19,6 +19,7 @@ from .maze import ExtraCellInfo, ExtendedMaze, Maze, Walls
 from .robots import (
     ROBOTS,
     basic_weighted_flood_fill,
+    dijkstra_flood_fill,
     idle_robot,
     random_robot,
     simple_flood_fill,
@@ -199,6 +200,8 @@ class GUIRenderer(Renderer):  # pylint: disable=too-many-instance-attributes
                 self.sim.restart(self.get_selected_robot())
         elif event.type == pg.KEYDOWN:
             match (event.key, event.mod & pg.KMOD_SHIFT != 0):
+                case (pg.K_d, True):
+                    self.sim.restart(dijkstra_flood_fill)
                 case (pg.K_d, _):
                     self.sim.restart(thorough_flood_fill)
                 case (pg.K_f, True):
