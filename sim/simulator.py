@@ -10,10 +10,10 @@ from dataclasses import dataclass
 from enum import auto, Enum
 from typing import Self, TYPE_CHECKING
 
-from .directions import Direction, RelativeDirection
+from .directions import Direction
 from .maze import ExtendedMaze, Maze
 from .robots import Action, RobotState
-from .robots.utils import build_weighted_graph, dijkstra, direction_to_wall
+from .robots.utils import direction_to_wall
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -171,23 +171,6 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
         if not self.connected(self._begin[:-1], self._end):
             raise ValueError("the starting position (begin) is not connected to all goal positions (end)")
 
-        self._maze.route = min(
-            dijkstra(
-                build_weighted_graph(
-                    self._maze,
-                    {
-                        RelativeDirection.FRONT: 1,
-                        RelativeDirection.BACK: 2,
-                        RelativeDirection.LEFT: 4,
-                        RelativeDirection.RIGHT: 4,
-                    },
-                    start=self._begin,
-                ),
-                self._begin[:-1],
-                goals=self._end,
-            ).values(),
-        )[1]
-
         self.restart(alg)
 
     def restart(self, alg: Algorithm):
@@ -205,6 +188,9 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
         print(f"sim: restarting with a {self.maze.height}x{self.maze.width} maze")
         print(f"sim: robot will start at {self._begin[:-1]} facing {self._begin[-1]}")
         self._maze.reset_info()
+        for _, _, info in self._maze.iter_info():
+            info.weight = info.visited
+
         self._robot_maze = ExtendedMaze.empty(self.maze.height, self.maze.width)
         self._robot_pos = self._begin
 
@@ -265,7 +251,7 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
 
         match action:
             case Action.READY:
-                pass
+                self._robot_pos = self._robot_pos
                 # self._status = SimulationStatus.ERROR
                 # raise RuntimeError(f"robot malfunction - yielded {action} instead of moving")
             case Action.RESET:
@@ -327,6 +313,7 @@ class Simulator:  # pylint: disable=too-many-instance-attributes
         self._robot_maze.extra_info[robot_pos].visit_cell()
         info: ExtraCellInfo = self._maze.extra_info[robot_pos]
         info.visit_cell()
+        info.weight = info.visited
 
     @property
     def maze(self) -> ExtendedMaze:  # TODO: readonly version

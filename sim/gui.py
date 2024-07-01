@@ -109,7 +109,7 @@ class GUIRenderer(Renderer):  # pylint: disable=too-many-instance-attributes
 
         self.sim_speed_slider = pygame_gui.elements.UIHorizontalSlider(
             relative_rect=pg.Rect((0, 0), (0, 0)),
-            start_value=self.step_delay.total_seconds(),
+            start_value=self.step_delay.total_seconds() and 0.0,
             value_range=(0.0, 1.0),
             manager=self.ui_manager,
         )

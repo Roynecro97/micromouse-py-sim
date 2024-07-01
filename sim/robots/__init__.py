@@ -30,8 +30,10 @@ from .wall_follower import wall_follower_robot
 from ..directions import RelativeDirection
 
 if TYPE_CHECKING:
+    from collections.abc import Set
     from typing import Callable
     from .utils import Algorithm, Robot
+    from ..maze import Maze
 
 ROBOTS: dict[str, Algorithm] = {
     'Idle': idle_robot,
@@ -114,3 +116,14 @@ if TYPE_CHECKING:
     del Callable
 
 del RelativeDirection, annotations, cache, overload, TYPE_CHECKING
+
+
+@register_robot("Heatmap Generator")
+def heatmap_robot(maze: Maze, goals: Set[tuple[int, int]]) -> Robot:
+    """Dumb robot for drawing a heatmap. Requires the heatmap maze."""
+    _ = maze, goals
+    yield Action.READY
+    for heat in range(7):
+        for _ in range(heat):
+            yield Action.READY
+        yield Action.FORWARD
