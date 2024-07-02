@@ -77,8 +77,6 @@ simulator's code.
 
 ## Running the Simulation
 
-<!-- TODO: Add images-->
-
 With the simulation installed, the `micromouse` command should be automatically
 added to the path:
 
@@ -599,6 +597,26 @@ This package provides a basic GUI renderer (`sim.gui.GUIRenderer`) based on
 `pygame`.
 
 To use it, the package should be installed with the `gui` feature enabled.
+
+![Default GUI Main Screen](documents/images/simulation_heatmap.png)
+
+The default GUI provides:
+
++ Robot selection dropdown - select the algorithm to examine.
++ `Start`/`Stop` button - start/stop simulation autoplay.
++ `Step` button - perform single step (stops autoplay).
++ Simulation delay slider - control artificial simulation delay.
++ Information about the starting point and goals.
++ Robot performance counters: Steps, Weight, Cells.
++ Simulation maze view (left) - full view of the maze with the optimal solution
+  highlighted, and a cell heatmap.
++ Robot maze view (right) - the maze, as seen by the robot, with additional
+  information the robot can add (see `ExtraCellInfo` in [sim.maze](#simmaze)).
++ Explored cells count and percentage (bottom).
+
+#### Heatmap Index
+
+![Heatmap Index](documents/images/heatmap.png)
 
 ### Adding Other Renderers
 
