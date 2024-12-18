@@ -46,5 +46,11 @@
         "start_pos": [15, 0],
         "start_direction": "north",
         "goals": [[7, 7], [7, 8], [8, 7], [8, 8]]
+    },
+    "small": {
+        "file": "mazes/small.maze",
+        "start_pos": [7, 0],
+        "start_direction": "east",
+        "goals": [[3, 3], [3, 4], [4, 3], [4, 4]]
     }
 }
