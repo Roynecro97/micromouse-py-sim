@@ -49,7 +49,7 @@ class OneBasedCounter(Counter):
     if TYPE_CHECKING:
         @classmethod
         def fromkeys(cls, iterable, v=None):
-            # This is defined in Counter by pylint decided it's an unimplemented *abstract* function
+            # This is defined in Counter but pylint decided it's an unimplemented *abstract* function
             raise NotImplementedError('Counter.fromkeys() is undefined.  Use OneBasedCounter(iterable) instead.')
 
 

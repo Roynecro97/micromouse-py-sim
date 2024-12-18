@@ -328,7 +328,7 @@ class LoadPreset(argparse.Action):
     (additional whitespaces are allowed)
     """
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
             self,
             option_strings: Sequence[str],
             dest: str,

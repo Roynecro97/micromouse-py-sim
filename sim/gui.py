@@ -243,7 +243,7 @@ class GUIRenderer(Renderer):  # pylint: disable=too-many-instance-attributes
             robot_direction: Direction = Direction.NORTH,
             *,
             heatmap: bool = False,
-    ):  # pylint: disable=too-many-arguments,too-many-locals,too-many-branches
+    ):  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-branches
         """Draw the maze on screen.
 
         Args:

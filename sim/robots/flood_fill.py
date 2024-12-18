@@ -559,7 +559,7 @@ def _mark_deadends_flood(
     return dead_ends_groups
 
 
-def _calc_unknown_groups(  # pylint: disable=too-many-arguments
+def _calc_unknown_groups(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         maze: ExtendedMaze,
         pos: tuple[int, int],
         start: tuple[int, int],
